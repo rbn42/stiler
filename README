@@ -13,6 +13,7 @@ simple          - The basic tiling layout . 1 Main + all other at the side.
 horiz_simple    - Basic horizontal tiling . 1 Main + all other below.
 swap            - Will swap the active window to master column
 cycle           - Cycle all the windows in the master pane
+cycle_horiz     - Cycle all the windows in the master pane (horizontal mode)
 vertical        - Simple vertical tiling
 horizontal 	    - Simple horizontal tiling
 maximize        - Maximize the active window/ for openbox which doesn't permit resizing of max windows

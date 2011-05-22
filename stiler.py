@@ -597,6 +597,16 @@ def cycle_option():
     winlist = winlist[:-1]
     arrange(get_simple_tile(len(winlist)),winlist)
 
+def cycle_horiz_option():
+    """
+    Cycle all the windows in the master pane (horizontal mode)
+    """
+    winlist = create_win_list()
+    winlist.insert(0,winlist[len(winlist)-1])
+    winlist = winlist[:-1]
+    arrange(get_horiz_simple_tile(len(winlist)),winlist)
+
+
 def maximize_option():
     """
     Maximize the active window
