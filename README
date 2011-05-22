@@ -10,6 +10,7 @@ Usage: stiler.py layout_option [flags]
 
 Standard layout_options:
 simple          - The basic tiling layout . 1 Main + all other at the side.
+horiz_simple    - Basic horizontal tiling . 1 Main + all other below.
 swap            - Will swap the active window to master column
 cycle           - Cycle all the windows in the master pane
 vertical        - Simple vertical tiling
