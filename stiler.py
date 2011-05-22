@@ -212,6 +212,24 @@ def get_simple_tile(wincount):
 
     return layout
 
+def get_horiz_simple_tile(wincount):
+    cols = wincount -1
+    layout = []
+    if cols == 0:
+        layout.append((OrigX,OrigY,MaxWidth,MaxHeight-WinTitle-WinBorder))
+        return layout
+    else:
+        top_win_height = int((MaxHeight-WinTitle-WinBorder)*MwFactor)
+        layout.append((OrigX,OrigY,MaxWidth-WinBorder,top_win_height))
+
+        y=OrigY + top_win_height+(2*WinBorder)
+        width=int(MaxWidth/cols - WinBorder)
+        height=int((MaxHeight*(1-MwFactor))-2*WinBorder)
+        for n in range(0,cols):
+            x= OrigX+int((MaxWidth/cols)*(n))
+            layout.append((x,y,width,height))
+
+        return layout
 
 def get_vertical_tile(wincount):
     layout = [] 
@@ -491,6 +509,13 @@ def simple_option():
     """
     Windows = create_win_list()
     arrange(get_simple_tile(len(Windows)),Windows)
+
+def horiz_simple_option():
+    """
+    Basic horizontal tiling layout . 1 Main + all other below.
+    """
+    Windows  = create_win_list()
+    arrange(get_horiz_simple_tile(len(Windows)),Windows)
 
 def swap_windows(window1,window2):
     """
