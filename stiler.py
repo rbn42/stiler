@@ -27,6 +27,8 @@ import pickle
 import ConfigParser
 import types
 import logging
+import xutils
+from collections import defaultdict
 
 PROGRAM_NAME = "Simple Window Tiler"
 PROGRAM_VERSION = "0.2"
@@ -59,7 +61,7 @@ def initconfig():
     
     
     if not os.path.exists(rcfile):
-    	log.info("writing new config file to "+rcfile)
+        log.info("writing new config file to "+rcfile)
         cfg=open(rcfile,'w')
         config.write(cfg)
         cfg.close()
@@ -105,45 +107,44 @@ def is_valid_window(window):
     """
     
     if WindowFilter == True:
-        window_type = commands.getoutput("xprop -id "+window+" _NET_WM_WINDOW_TYPE | cut -d_ -f10").split("\n")[0]
-        window_state = commands.getoutput("xprop -id "+window+" WM_STATE | grep \"window state\" | cut -d: -f2").split("\n")[0].lstrip()
+        return window.visible
+#        window_type = commands.getoutput("xprop -id "+window+" _NET_WM_WINDOW_TYPE | cut -d_ -f10").split("\n")[0]
+#        window_state = commands.getoutput("xprop -id "+window+" WM_STATE | grep \"window state\" | cut -d: -f2").split("\n")[0].lstrip()
         
-        logging.debug("%s is type %s, state %s" % (window,window_type,window_state))
+#        logging.debug("%s is type %s, state %s" % (window,window_type,window_state))
         
-        if window_type == "UTILITY" or window_type == "DESKTOP" or window_state == "Iconic" or window_type == "DOCK" :
-            return False
+#        if window_type == "UTILITY" or window_type == "DESKTOP" or window_state == "Iconic" or window_type == "DOCK" :
+#            return False
             
     return True
 
 def initialize():
-
-    desk_output = commands.getoutput("wmctrl -d").split("\n")
-    desk_list = [line.split()[0] for line in desk_output]
-
-    current =  filter(lambda x: x.split()[1] == "*" , desk_output)[0].split()
-
-    desktop = current[0]
-    width =  current[8].split("x")[0]
-    height =  current[8].split("x")[1]
-    orig_x =  current[7].split(",")[0]
-    orig_y =  current[7].split(",")[1]
-
-    win_output = commands.getoutput("wmctrl -lG").split("\n")
-    win_list = {}
-
-    for desk in desk_list:
-        win_list[desk] = map(lambda y: hex(int(y.split()[0],16)) , filter(lambda x: x.split()[1] == desk, win_output ))
-
-    return (desktop,orig_x,orig_y,width,height,win_list)
+    desk_infos = xutils.get_desktop_geom()
+    windows = xutils.get_windows()
+    desktop = xutils.get_current_desktop()
+    return (desktop, 0, 0, desk_infos.width, desk_infos.height, windows)
+#    desk_output = commands.getoutput("wmctrl -d").split("\n")
+#    desk_list = [line.split()[0] for line in desk_output]
+#
+#    current =  filter(lambda x: x.split()[1] == "*" , desk_output)[0].split()
+#
+#    desktop = current[0]
+#    width =  current[8].split("x")[0]
+#    height =  current[8].split("x")[1]
+#    orig_x =  current[7].split(",")[0]
+#    orig_y =  current[7].split(",")[1]
+#
+#    win_output = commands.getoutput("wmctrl -lG").split("\n")
+#    win_list = {}
+#
+#    for desk in desk_list:
+#        win_list[desk] = map(lambda y: hex(int(y.split()[0],16)) , filter(lambda x: x.split()[1] == desk, win_output ))
+#
+#    return (desktop,orig_x,orig_y,width,height,win_list)
 
 
 def get_active_window():
-    active = commands.getoutput("xprop -root _NET_ACTIVE_WINDOW | cut -d' ' -f5 | cut -d',' -f1")
-    if is_valid_window(active) == True:
-    	logging.debug("obtained active window: '"+str(active)+"'")
-        return active
-    else:
-        return 0
+    return xutils.get_active_window()
 
 def get_window_width_height(window_id):
     """
@@ -272,21 +273,18 @@ def move_active(PosX,PosY,Width,Height):
     move_window(windowid,PosX,PosY,Width,Height)
 
 
-def move_window(windowid,PosX,PosY,Width,Height):
+def move_window(win,PosX,PosY,Width,Height):
     """
     Resizes and moves the given window to the given position and dimensions
     """
     PosX = int(PosX)
     PosY = int(PosY)
     
-    logging.debug("moving window: %s to (%s,%s,%s,%s) " % (windowid,PosX,PosY,Width,Height))
+    logging.debug("moving window: %s to (%s,%s,%s,%s) " % (win.id,PosX,PosY,Width,Height))
     
-    if windowid == ":ACTIVE:":
-		window = "-r "+windowid
-    else:
-        window = "-i -r "+windowid
+    window = "-i -r %i"%win.id
 
-	# NOTE: metacity doesn't like resizing and moving in the same step
+    # NOTE: metacity doesn't like resizing and moving in the same step
     # unmaximize
     os.system("wmctrl "+window+" -b remove,maximized_vert,maximized_horz")
     # resize
@@ -468,13 +466,30 @@ def right_option():
     
 
 def compare_win_list(newlist,oldlist):
+    # The goal here is to keep the ordering of existing window from oldlist and
+    # add new windows at the end.
+    def get_by_wid(win_list, wid):
+        for w in win_list:
+            if w.id == wid:
+                return w
+        return None
+
     templist = []
+    # Note that we want to add the new WindowInfo because it will have up-to-date
+    # geometry infos
     for window in oldlist:
-        if newlist.count(window) != 0:
-            templist.append(window)
+        print "old win : %i"%window.id
+        w = get_by_wid(newlist, window.id)
+        if w != None:
+            templist.append(w)
+
     for window in newlist:
-        if oldlist.count(window) == 0: 
+        print "new win : %i"%window.id
+        w = get_by_wid(oldlist, window.id)
+        if w == None:
             templist.append(window)
+    
+    print "templist : %s"%', '.join(["%i"%w.id for w in templist])
     return templist
 
 
@@ -490,6 +505,7 @@ def create_win_list():
         else:
             Windows = compare_win_list(Windows,OldWindows)
 
+    print 'bouh'
     for win in Windows:
         if is_valid_window(win) == False:
             Windows.remove(win)
@@ -515,6 +531,7 @@ def horiz_simple_option():
     Basic horizontal tiling layout . 1 Main + all other below.
     """
     Windows  = create_win_list()
+    print "%i windows"%len(Windows)
     arrange(get_horiz_simple_tile(len(Windows)),Windows)
 
 def swap_windows(window1,window2):
@@ -728,7 +745,7 @@ def initialize_global_variables():
 
     CENTER_WIDTHS = filter(lambda y: y < 0.5, CORNER_WIDTHS)
     CENTER_WIDTHS = map(lambda y:round(abs(y*2-1.0),2),CENTER_WIDTHS)
-    CENTER_WIDTHS.append(1.0)				 # always allow max for centers
+    CENTER_WIDTHS.append(1.0)                # always allow max for centers
     CENTER_WIDTHS = list(set(CENTER_WIDTHS)) # filter dups
     CENTER_WIDTHS.sort()
 
@@ -739,11 +756,11 @@ def initialize_global_variables():
     logging.debug("corner widths: %s" % CORNER_WIDTHS)
     logging.debug("center widths: %s" % CENTER_WIDTHS)
 
-    (Desktop,OrigXstr,OrigYstr,MaxWidthStr,MaxHeightStr,WinList) = initialize()
-    MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
-    MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
-    OrigX = int(OrigXstr) + LeftPadding
-    OrigY = int(OrigYstr) + TopPadding 
+    (Desktop,OrigX,OrigY,MaxWidth,MaxHeight,WinList) = initialize()
+    #MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
+    #MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
+    #OrigX = int(OrigXstr) + LeftPadding
+    #OrigY = int(OrigYstr) + TopPadding 
     OldWinList = retrieve(TempFile)
 
 
