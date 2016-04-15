@@ -166,14 +166,22 @@ def change_tile(ANTI=False):
 
     store(TILE, TempFile2)
 
-    column2 = lambda w: get_columns_tile(w, 2)
-    column3 = lambda w: get_columns_tile(w, 3)
-    row2 = lambda w: get_columns_tile(w, int(math.ceil(w / 2.0)))
-    row3 = lambda w: get_columns_tile(w, int(math.ceil(w / 3.0)))
-    TILES = [get_simple_tile, get_auto_tile, get_horiz_tile, column2, column3,
-             row2, row3, get_fair_tile,
+    TILES = [get_simple_tile,  get_horiz_tile,  get_fair_tile,
              get_autogrid_tile, maximize, minimize, get_vertical_tile]
-    TILES = [get_simple_tile,  get_autogrid_tile, get_horiz_tile, maximize]
+
+    if len(winlist)<2:
+        TILES = []
+    elif len(winlist)%2==0:
+        TILES = [lambda w:get_columns_tile2(w,reverse=False,cols=2)]
+    else:
+        TILES = [lambda w:get_columns_tile2(w,reverse=False,cols=2),
+                lambda w:get_columns_tile2(w,reverse=True,cols=2),]
+    if len(winlist)>3:
+        TILES.append(get_simple_tile)
+
+    TILES.append(lambda w:get_columns_tile2(w,reverse=False,cols=1))
+
+#    TILES = [column2]
     # TODO TILES:可选的布局模式
     tile = TILES[t % len(TILES)](len(winlist))
     if None == tile:
@@ -181,11 +189,6 @@ def change_tile(ANTI=False):
     arrange(tile, winlist)
 
 
-def get_auto_tile(wincount):
-    if wincount < 3:
-        return get_autogrid_tile(wincount)
-    else:
-        return get_columns_tile(wincount, 2)
 
 
 def get_vertical_tile(wincount):
@@ -230,6 +233,22 @@ def get_autogrid_tile(wincount):
     return layout[:wincount]
 # end https://bbs.archlinux.org/viewtopic.php?id=64100&p=6  #150
 
+def get_columns_tile2(wincount,reverse=False,cols=2):
+    layout = []
+    colwidth= int(MaxWidth/ cols)
+    windowsleft = wincount
+    if reverse:
+        _range=range(cols-1,-1,-1)
+    else:
+        _range=range(cols)
+    for col in _range:
+        rows= min(int(math.ceil(float(wincount) / cols)), windowsleft)
+        windowsleft -= rows
+        rowheight= MaxHeight/ rows
+        for row in range(rows):
+            layout.append((OrigX + colwidth * col, OrigY + row *
+                           rowheight, colwidth-2*WinBorder, rowheight - WinTitle - WinBorder))
+    return layout[:wincount]
 # from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
 
 
@@ -315,13 +334,6 @@ def compare_win_list(newlist, oldlist):
 def create_win_list():
     Windows = WinList[Desktop]
 
-    # OldWinList已知的作用是保留原有的window顺序
-    # 这个一维数组变量最主要在change_layout的时候起作用,旧有的窗口layout信息不再起效,而是以这个变量为准重排窗口.如果把这个变量改成tree的话,大概就可以做到和i3相近的事情了.
-    # TODO 希望和OldWinList作完全对比,推断是否有必要重绘layout,以及判断重绘的方式,比如如何插入新窗口或者删除旧窗口留下的空缺.
-    # 一个问题是,move_window因为没有处理好细节,在移动的时候会造成可以累计下来的误差.最好是要有能力判断有新窗口开启,关闭,有窗口形状改变.这样的话,可以判断是否重载旧的layout,就不会造成误差累积了.比较明显的例子是在gnome-terminal和tilda混用的时候swap窗口.
-    # 一个办法是,为所有winid,记录下stiler给予的xywh_defined,和最终被分配的xywh_actual,如果xywh_actual没有改变,就把xywh_defined当做layout来用
-    # TODO
-    # 关于跨工作区记录的问题,unity7下,wmctrl给出的workspace编号并不准确,所以记录一个新的工作区有可能消去旧的工作区的layout信息.最好能用wmctrl意外的办法找出当前workspace编号,不过不知道跨DE是否兼容
 
     if OldWinList == {}:
         pass
@@ -391,24 +403,34 @@ def find(center, target, winlist):
     find the nearest window in the target direction.
     '''
     lay = get_current_tile(winlist)
-    m = {w: l for w, l in zip(winlist, lay)}
-    lay_center = m[center]
+    cal_center =lambda x,y,w,h:[x+w/2.5,y+h/2.5]
+    m = {w:l for w, l in zip(winlist, lay)}
+    lay_center =cal_center(* m[center])
     _min = -1
     _r = None
     for w, l in zip(winlist, lay):
+        l=cal_center(*l)
         bias1, bias2 = 1.0, 1.0
-        bias = 4.0
+        bias =  4.0
         if target == 'down':
             delta = l[1] - lay_center[1]
+            if (l[0]-lay_center[0])**2>(l[1]-lay_center[1])**2:
+                continue
             bias1 = bias
         if target == 'up':
             delta = lay_center[1] - l[1]
+            if (l[0]-lay_center[0])**2>(l[1]-lay_center[1])**2:
+                continue
             bias1 = bias
         if target == 'right':
             delta = l[0] - lay_center[0]
+            if (l[0]-lay_center[0])**2<(l[1]-lay_center[1])**2:
+                continue
             bias2 = bias
         if target == 'left':
             delta = lay_center[0] - l[0]
+            if (l[0]-lay_center[0])**2<(l[1]-lay_center[1])**2:
+                continue
             bias2 = bias
         distance = bias1 * (l[0] - lay_center[0])**2 + \
             bias2 * (l[1] - lay_center[1])**2
