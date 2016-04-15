@@ -1,4 +1,4 @@
-A window tiling and navigation tool. I tried to imitate very basic functions of i3-wm.
+This is a window tiling and navigation tool based on wmctrl and xdotool. I tried to imitate the very basic functions of i3-wm.
 
 Dependencies
 =
@@ -30,6 +30,6 @@ Recommended Keyboard Mapping
 |`<Super> l`    |  `python stiler.py focus right` |
 |`<Super> <Shift> l`    |  `python stiler.py swap right` |
 
-This is a configuration file dumped for Unity7:
+Here is a configuration file dumped for Unity7:
 [org.gnome.settings-daemon.plugins.media-keys](https://github.com/rbn42/home/blob/master/config/dconf/org.gnome.settings-daemon.plugins.media-keys)
 
