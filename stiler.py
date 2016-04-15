@@ -54,6 +54,7 @@ RightPadding = 20
 WinTitle = 28
 WinBorder = 5
 MwFactor = 0.55
+NavigateAcrossWorkspaces=True #availabe in unity7
 TempFile = "/dev/shm/.stiler_db"
 TempFile2 = "/dev/shm/.stiler_db2"
 
@@ -175,7 +176,7 @@ def change_tile(reverse=False):
             'minimize':minimize,
             }
 
-    winlist = create_win_list()
+    winlist = create_win_list(WinList)
 
     if len(winlist)<2:
         TILES = []
@@ -358,11 +359,8 @@ def compare_win_list(newlist, oldlist):
     return templist
 
 
-def create_win_list(_all=False):
-    if _all:
-        Windows = WinListAll[Desktop]
-    else:
-        Windows = WinList[Desktop]
+def create_win_list(winlist):
+    Windows = winlist[Desktop]
 
 
     if OldWinList == {}:
@@ -399,7 +397,7 @@ def get_current_tile(wins,posinfo):
 
 
 def cycle(reverse=False):
-    winlist = create_win_list()
+    winlist = create_win_list(WinList)
     lay = get_current_tile(winlist,WinPosInfo)
     shift = -1 if reverse else 1
     winlist = winlist[shift:] + winlist[:shift]
@@ -412,7 +410,7 @@ def cycle(reverse=False):
 
 
 def swap(target):
-    winlist = create_win_list()
+    winlist = create_win_list(WinList)
     active = get_active_window()
     target = find(active, target, winlist,WinPosInfo)
     if None == target:
@@ -472,9 +470,17 @@ def find(center, target, winlist,posinfo):
 
 
 def focus(target):
-    Windows = create_win_list(_all=True)
+    if NavigateAcrossWorkspaces:
+        Windows = create_win_list(WinListAll)
+    else:
+        Windows = create_win_list(WinList)
+
     active = get_active_window()
-    target = find(active, target, Windows,WinPosInfoAll)
+
+    if NavigateAcrossWorkspaces:
+        target = find(active, target, Windows,WinPosInfoAll)
+    else:
+        target = find(active, target, Windows,WinPosInfo)
     if None == target:
         return
     i1 = Windows.index(target)
@@ -482,7 +488,7 @@ def focus(target):
 
 
 def minimize(wincount):
-    winlist = create_win_list()
+    winlist = create_win_list(WinList)
     for win in winlist:
         minimize_one(win)
 
