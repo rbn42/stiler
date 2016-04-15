@@ -150,40 +150,57 @@ def get_simple_tile(wincount):
     return layout
 
 
-def change_tile(ANTI=False):
+def change_tile(reverse=False):
+    # TODO TILES:可选的布局模式
+    tiles_map={
+            'col2_l':lambda w:get_columns_tile2(w,reverse=False,cols=2),
+            'col2_r':lambda w:get_columns_tile2(w,reverse=False,cols=2),
+            'simple':get_simple_tile,
+            'col1':lambda w:get_columns_tile2(w,reverse=False,cols=1),
+            'horiz':get_horiz_tile,
+            'vertical':get_vertical_tile,
+            'fair':get_fair_tile,
+            'autogrid':get_autogrid_tile,
+            'maximize':maximize,
+            'minimize':minimize,
+            }
+
     winlist = create_win_list()
-
-    if not TILE.get('w', 0) == len(winlist):
-        shift = 0
-    elif ANTI:
-        shift = - 1
-    else:
-        shift = 1
-    t = TILE.get('t', -1) + shift
-
-    TILE['t'] = t
-    TILE['w'] = len(winlist)
-
-    store(TILE, TempFile2)
-
-    TILES = [get_simple_tile,  get_horiz_tile,  get_fair_tile,
-             get_autogrid_tile, maximize, minimize, get_vertical_tile]
 
     if len(winlist)<2:
         TILES = []
     elif len(winlist)%2==0:
-        TILES = [lambda w:get_columns_tile2(w,reverse=False,cols=2)]
+        TILES = ['col2_l']
     else:
-        TILES = [lambda w:get_columns_tile2(w,reverse=False,cols=2),
-                lambda w:get_columns_tile2(w,reverse=True,cols=2),]
+        TILES = ['col2_l','col2_r']
     if len(winlist)>3:
-        TILES.append(get_simple_tile)
+        TILES.append('simple')
+    TILES.append('col1')
 
-    TILES.append(lambda w:get_columns_tile2(w,reverse=False,cols=1))
 
-#    TILES = [column2]
-    # TODO TILES:可选的布局模式
-    tile = TILES[t % len(TILES)](len(winlist))
+    if not TILE.get('num_windows', 0) == len(winlist):
+        shift = 0
+    elif reverse:
+        shift = - 1
+    else:
+        shift = 1
+
+    t = TILE.get('tile',None )
+    if 0 ==shift and t in tiles_map:
+        pass
+    elif t in TILES:
+        i0=TILES.index(t)
+        i1=i0+shift
+        t=TILES[i1%len(TILES)]
+    else:
+        t=TILES[0]
+    
+
+    TILE['tile'] = t
+    TILE['num_windows'] = len(winlist)
+    store(TILE, TempFile2)
+
+    tile =tiles_map[t](len(winlist))
     if None == tile:
         return
     arrange(tile, winlist)
@@ -368,10 +385,10 @@ def get_current_tile(wins):
     return l
 
 
-def cycle(ANTI=False):
+def cycle(reverse=False):
     winlist = create_win_list()
     lay = get_current_tile(winlist)
-    shift = -1 if ANTI else 1
+    shift = -1 if reverse else 1
     winlist = winlist[shift:] + winlist[:shift]
     arrange(lay, winlist)
 
@@ -475,11 +492,11 @@ if __name__ == '__main__':
     elif arguments['cycle']:
         cycle()
     elif arguments['anticycle']:
-        cycle(ANTI=True)
+        cycle(reverse=True)
     elif arguments['swap']:
         swap(target)
     elif arguments['focus']:
         focus(target)
     elif arguments['layout']:
         assert not arguments['next'] == arguments['prev']
-        change_tile(ANTI=arguments['prev'])
+        change_tile(reverse=arguments['prev'])
