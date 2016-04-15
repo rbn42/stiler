@@ -420,7 +420,7 @@ def find(center, target, winlist):
     find the nearest window in the target direction.
     '''
     lay = get_current_tile(winlist)
-    cal_center =lambda x,y,w,h:[x+w/2.5,y+h/2.5]
+    cal_center =lambda x,y,w,h:[x+w/2.2,y+h/2.2]
     m = {w:l for w, l in zip(winlist, lay)}
     lay_center =cal_center(* m[center])
     _min = -1
