@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: UTF-8 -*-
 
 ############################################################################
 # Copyright (c) 2009   unohu <unohu0@gmail.com>                            #
@@ -17,204 +18,310 @@
 #                                                                          #
 ############################################################################
 
-import sys
+"""
+Tiling window on any window manager. 
+
+Usage:
+  stiler.py (focus|swap) (up|down|left|right)
+  stiler.py layout (next|prev)
+  stiler.py cycle 
+  stiler.py anticycle 
+  stiler.py -h | --help
+
+Options:
+  -h --help     Show this screen.
+"""
+
 import os
-import commands
-import pickle
-import ConfigParser
+import re
+import subprocess
+import time
 
-def initconfig():
-    rcfile=os.getenv('HOME')+"/.stilerrc"
-    if not os.path.exists(rcfile):
-        cfg=open(rcfile,'w')
-        cfg.write("""#Tweak these values 
-[default]
-BottomPadding = 0
-TopPadding = 0
-LeftPadding = 0
-RightPadding = 0
-WinTitle = 21
-WinBorder = 1
-MwFactor = 0.65
-TempFile = /tmp/tile_winlist
-""")
-        cfg.close()
 
-    config=ConfigParser.RawConfigParser()
-    config.read(rcfile)
-    return config
+def _exec_and_output(cmd):
+    ENCODING = 'utf8'
+    return subprocess.check_output(cmd, shell=True).decode(ENCODING)
 
+
+def _exec(cmd):
+    # print(cmd)
+    os.system(cmd)
+
+BottomPadding = 20
+TopPadding = 20
+LeftPadding = 20
+RightPadding = 20
+WinTitle = 28
+WinBorder = 5
+MwFactor = 0.55
+TempFile = "/dev/shm/.stiler_db"
+TempFile2 = "/dev/shm/.stiler_db2"
+
+r_wmctrl_lG = '^([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(.+)$'
+r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
 
 def initialize():
-    desk_output = commands.getoutput("wmctrl -d").split("\n")
+    desk_output = _exec_and_output("wmctrl -d").strip().split("\n")
     desk_list = [line.split()[0] for line in desk_output]
 
-    current =  filter(lambda x: x.split()[1] == "*" , desk_output)[0].split()
-
+    current = [x for x in desk_output if x.split()[1] == "*"][0]
+    current = re.findall(r_wmctrl_d, current.strip())[0]
     desktop = current[0]
-    width =  current[8].split("x")[0]
-    height =  current[8].split("x")[1]
-    orig_x =  current[7].split(",")[0]
-    orig_y =  current[7].split(",")[1]
+    orig_x, orig_y, width, height = current[-4:]
 
-    win_output = commands.getoutput("wmctrl -lG").split("\n")
+    s = _exec_and_output("xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' ")
+    x, y = s.split('x')
+    resx, resy = int(x), int(y)
+
+    win_output = _exec_and_output("wmctrl -lG").strip().split("\n")
     win_list = {}
 
-    for desk in desk_list:
-        win_list[desk] = map(lambda y: hex(int(y.split()[0],16)) , filter(lambda x: x.split()[1] == desk, win_output ))
+    win_filtered = []
+    for win in win_output:
+        _, _, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[0]
+        x, y = int(x), int(y)
+        if x < 0 or x >= resx or y < 0 or y >= resy:
+            continue
+        if host == 'N/A':
+            continue
+        if name in ['<unknown>', 'x-nautilus-desktop', 'unity-launcher', 'unity-panel'] + ['Hud', 'unity-dash', 'Desktop', 'XdndCollectionWindowImp']:
+            continue
+        win_filtered.append(win)
+        # TODO 用xwininfo排除掉minimized窗口
 
-    return (desktop,orig_x,orig_y,width,height,win_list)
+    for desk in desk_list:
+        win_list[desk] = [int(x.split()[0], 16)
+                          for x in win_filtered if x.split()[1] == desk]
+
+    return (desktop, orig_x, orig_y, width, height, win_list, win_filtered)
 
 
 def get_active_window():
-    return str(hex(int(commands.getoutput("xdotool getactivewindow 2>/dev/null").split()[0])))
-    
+    return int(_exec_and_output("xdotool getactivewindow").split()[0])
 
-def store(object,file):
+
+def store(object, file):
     with open(file, 'w') as f:
-        pickle.dump(object,f)
-    f.close()
+        f.write(str(object))
 
 
 def retrieve(file):
-    try:
-        with open(file,'r+') as f:
-            obj = pickle.load(f)
-        f.close()
-        return(obj)
-    except:
-        f = open(file,'w')
-        f.close
-        dict = {}
-        return (dict)
+    if os.path.exists(file):
+        return eval(open(file).read())
+    else:
+        return {}
 
 
-# Get all global variables
-Config = initconfig()
-BottomPadding = Config.getint("default","BottomPadding")
-TopPadding = Config.getint("default","TopPadding")
-LeftPadding = Config.getint("default","LeftPadding")
-RightPadding = Config.getint("default","RightPadding")
-WinTitle = Config.getint("default","WinTitle")
-WinBorder = Config.getint("default","WinBorder")
-MwFactor = Config.getfloat("default","MwFactor")
-TempFile = Config.get("default","TempFile")
-(Desktop,OrigXstr,OrigYstr,MaxWidthStr,MaxHeightStr,WinList) = initialize()
+(Desktop, OrigXstr, OrigYstr, MaxWidthStr,
+ MaxHeightStr, WinList, WinPosInfo) = initialize()
 MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
 MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
 OrigX = int(OrigXstr) + LeftPadding
-OrigY = int(OrigYstr) + TopPadding 
+OrigY = int(OrigYstr) + TopPadding
 OldWinList = retrieve(TempFile)
+TILE = retrieve(TempFile2)
+
+WinPosInfo = [re.findall(r_wmctrl_lG, w)[0] for w in WinPosInfo]
+WinPosInfo = {int(_id, 16): (_name, [int(x), int(y), int(
+    w), int(h)]) for _id, _ws, x, y, w, h, _host, _name in WinPosInfo}
+for _id in WinPosInfo:
+    WinPosInfo[_id][1][1] += -72 + 44
 
 
 def get_simple_tile(wincount):
     rows = wincount - 1
-    layout = [] 
+    layout = []
     if rows == 0:
-        layout.append((OrigX,OrigY,MaxWidth,MaxHeight-WinTitle-WinBorder))
+        layout.append(
+            (OrigX, OrigY, MaxWidth, MaxHeight - WinTitle - WinBorder))
         return layout
     else:
-        layout.append((OrigX,OrigY,int(MaxWidth*MwFactor),MaxHeight-WinTitle-WinBorder))
+        layout.append((OrigX, OrigY, int(MaxWidth * MwFactor),
+                       MaxHeight - WinTitle - WinBorder))
 
-    x=OrigX + int((MaxWidth*MwFactor)+(2*WinBorder))
-    width=int((MaxWidth*(1-MwFactor))-2*WinBorder)
-    height=int(MaxHeight/rows - WinTitle-WinBorder)
-    
-    for n in range(0,rows):
-        y= OrigY+int((MaxHeight/rows)*(n))
-        layout.append((x,y,width,height))
+    x = OrigX + int((MaxWidth * MwFactor) + (2 * WinBorder))
+    width = int((MaxWidth * (1 - MwFactor)) - 2 * WinBorder)
+    height = int(MaxHeight / rows - WinTitle - WinBorder)
+
+    for n in range(0, rows):
+        y = OrigY + int((MaxHeight / rows) * (n))
+        layout.append((x, y, width, height))
 
     return layout
 
 
+def change_tile(ANTI=False):
+    winlist = create_win_list()
+
+    if not TILE.get('w', 0) == len(winlist):
+        shift = 0
+    elif ANTI:
+        shift = - 1
+    else:
+        shift = 1
+    t = TILE.get('t', -1) + shift
+
+    TILE['t'] = t
+    TILE['w'] = len(winlist)
+
+    store(TILE, TempFile2)
+
+    column2 = lambda w: get_columns_tile(w, 2)
+    column3 = lambda w: get_columns_tile(w, 3)
+    row2 = lambda w: get_columns_tile(w, int(math.ceil(w / 2.0)))
+    row3 = lambda w: get_columns_tile(w, int(math.ceil(w / 3.0)))
+    TILES = [get_simple_tile, get_auto_tile, get_horiz_tile, column2, column3,
+             row2, row3, get_fair_tile,
+             get_autogrid_tile, maximize, minimize, get_vertical_tile]
+    TILES = [get_simple_tile,  get_autogrid_tile, get_horiz_tile, maximize]
+    # TODO TILES:可选的布局模式
+    tile = TILES[t % len(TILES)](len(winlist))
+    if None == tile:
+        return
+    arrange(tile, winlist)
+
+
+def get_auto_tile(wincount):
+    if wincount < 3:
+        return get_autogrid_tile(wincount)
+    else:
+        return get_columns_tile(wincount, 2)
+
+
 def get_vertical_tile(wincount):
-    layout = [] 
+    layout = []
     y = OrigY
-    width = int(MaxWidth/wincount)
+    width = int(MaxWidth / wincount)
     height = MaxHeight - WinTitle - WinBorder
-    for n in range(0,wincount):
-        x= OrigX + n * width
-        layout.append((x,y,width,height))
+    for n in range(0, wincount):
+        x = OrigX + n * width
+        layout.append((x, y, width, height))
 
     return layout
 
 
 def get_horiz_tile(wincount):
-    layout = [] 
+    layout = []
     x = OrigX
-    height = int(MaxHeight/wincount - WinTitle - WinBorder)
+    height = int(MaxHeight / wincount - WinTitle - WinBorder)
     width = MaxWidth
-    for n in range(0,wincount):
-        y= OrigY + int((MaxHeight/wincount)*(n))
-        layout.append((x,y,width,height))
+    for n in range(0, wincount):
+        y = OrigY + int((MaxHeight / wincount) * (n))
+        layout.append((x, y, width, height))
 
     return layout
 
-def get_max_all(wincount):
-    layout = [] 
+# from https://bbs.archlinux.org/viewtopic.php?id=64100&p=6  #150
+import math
+
+
+def get_autogrid_tile(wincount):
+    layout = []
+    rows = int(math.floor(math.sqrt(wincount)))
+    rowheight = int(MaxHeight / rows)
+    windowsleft = wincount
+    for row in range(rows):
+        cols = min(int(math.ceil(float(wincount) / rows)), windowsleft)
+        windowsleft -= cols
+        colwidth = MaxWidth / cols
+        for col in range(cols):
+            layout.append((OrigX + colwidth * col, OrigY + row *
+                           rowheight, colwidth, rowheight - WinTitle - WinBorder))
+    return layout[:wincount]
+# end https://bbs.archlinux.org/viewtopic.php?id=64100&p=6  #150
+
+# from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
+
+
+def get_columns_tile(wincount, ncolumns):
+    # 2nd term rounds up if num columns not a factor of
+    # num windows; this leaves gaps at the bottom
+    nrows = (wincount / ncolumns) + int(bool(wincount % ncolumns))
+
+    layout = []
     x = OrigX
-    y = OrigY 
-    height = MaxHeight - WinTitle - WinBorder
-    width = MaxWidth
-    for n in range(0,wincount):
-        layout.append((x,y,width,height))
+    y = OrigY
+
+    height = int(MaxHeight / nrows - WinTitle - WinBorder)
+    width = int(MaxWidth / ncolumns - 2 * WinBorder)
+
+    for n in range(0, wincount):
+        column = n % ncolumns
+        row = n / ncolumns
+
+        x = OrigX + column * width
+        y = OrigY + (int((MaxHeight / nrows) * (row)))
+        layout.append((x, y, width, height))
 
     return layout
 
 
+def get_fair_tile(wincount):
+    import math
+    ncolumns = int(math.ceil(math.sqrt(wincount)))
+    return get_columns_tile(wincount, ncolumns)
+# end https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
 
-def move_active(PosX,PosY,Width,Height):
-    command =  " wmctrl -r :ACTIVE: -e 0," + str(PosX) + "," + str(PosY)+ "," + str(Width) + "," + str(Height)
-    os.system(command)
+
+def unmaximize_one(windowid):
+    command = " wmctrl -i -r %d -bremove,maximized_vert,maximized_horz" % windowid
+    _exec(command)
 
 
-def move_window(windowid,PosX,PosY,Width,Height):
-    command =  " wmctrl -i -r " + windowid +  " -e 0," + str(PosX) + "," + str(PosY)+ "," + str(Width) + "," + str(Height)
-    os.system(command)
-    command = "wmctrl -i -r " + windowid + " -b remove,hidden,shaded"
-    os.system(command)
+def maximize_one(windowid):
+    command = " wmctrl -i -r %d -badd,maximized_vert,maximized_horz" % windowid
+    _exec(command)
+
+
+def minimize_one(windowid):
+    command = 'xdotool windowminimize %d' % windowid
+    _exec(command)
+
+
+# def move_window(windowid, PosX, PosY, Width, Height):
+def move_window(windowid, x, y, w, h):
+    # Unmaximize window
+    unmaximize_one(windowid)
+    # Now move it
+    _name = WinPosInfo[windowid][0]
+    if 'tilda' == _name:
+        h += WinTitle
+    command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
+    _exec(command)
+    #command = "wmctrl -i -r " + windowid + " -b remove,hidden,shaded"
+#    _exec(command)
+#    command = 'xdotool windowmap "%s"' % windowid
+#    command = 'xdotool windowactivate "%s"' % windowid
 
 
 def raise_window(windowid):
-    if windowid == ":ACTIVE:":
-        command = "wmctrl -a :ACTIVE: "
-    else:
-        command - "wmctrl -i -a " + windowid
-    
-    os.system(command)
+    if False:
+        command = 'xdotool windowactivate %d' % windowid
+    command = "wmctrl -i -a %d" % windowid
+    _exec(command)
 
 
-def left():
-    Width=MaxWidth/2-1
-    Height=MaxHeight - WinTitle -WinBorder
-    PosX=LeftPadding
-    PosY=TopPadding
-    move_active(PosX,PosY,Width,Height)
-    raise_window(":ACTIVE:")
-
-
-def right():
-    Width=MaxWidth/2-1
-    Height=MaxHeight - WinTitle - WinBorder 
-    PosX=MaxWidth/2
-    PosY=TopPadding
-    move_active(PosX,PosY,Width,Height)
-    raise_window(":ACTIVE:")
-    
-
-def compare_win_list(newlist,oldlist):
+def compare_win_list(newlist, oldlist):
     templist = []
     for window in oldlist:
         if newlist.count(window) != 0:
             templist.append(window)
     for window in newlist:
-        if oldlist.count(window) == 0: 
+        if oldlist.count(window) == 0:
             templist.append(window)
     return templist
 
 
 def create_win_list():
     Windows = WinList[Desktop]
+
+    # OldWinList已知的作用是保留原有的window顺序
+    # 这个一维数组变量最主要在change_layout的时候起作用,旧有的窗口layout信息不再起效,而是以这个变量为准重排窗口.如果把这个变量改成tree的话,大概就可以做到和i3相近的事情了.
+    # TODO 希望和OldWinList作完全对比,推断是否有必要重绘layout,以及判断重绘的方式,比如如何插入新窗口或者删除旧窗口留下的空缺.
+    # 一个问题是,move_window因为没有处理好细节,在移动的时候会造成可以累计下来的误差.最好是要有能力判断有新窗口开启,关闭,有窗口形状改变.这样的话,可以判断是否重载旧的layout,就不会造成误差累积了.比较明显的例子是在gnome-terminal和tilda混用的时候swap窗口.
+    # 一个办法是,为所有winid,记录下stiler给予的xywh_defined,和最终被分配的xywh_actual,如果xywh_actual没有改变,就把xywh_defined当做layout来用
+    # TODO
+    # 关于跨工作区记录的问题,unity7下,wmctrl给出的workspace编号并不准确,所以记录一个新的工作区有可能消去旧的工作区的layout信息.最好能用wmctrl意外的办法找出当前workspace编号,不过不知道跨DE是否兼容
 
     if OldWinList == {}:
         pass
@@ -223,87 +330,134 @@ def create_win_list():
         if Windows == OldWindows:
             pass
         else:
-            Windows = compare_win_list(Windows,OldWindows)
+            Windows = compare_win_list(Windows, OldWindows)
 
     return Windows
 
 
-def arrange(layout,windows):
-    for win , lay  in zip(windows,layout):
-        move_window(win,lay[0],lay[1],lay[2],lay[3])
-    WinList[Desktop]=windows
-    store(WinList,TempFile)
+def arrange(layout, windows):
+    active = get_active_window()
+    for win, lay in zip(windows, layout):
+        move_window(win, lay[0], lay[1], lay[2], lay[3])
+    raise_window(active)
+    WinList[Desktop] = windows
+    store(WinList, TempFile)
 
 
-def simple():
+def get_current_tile(wins):
+    l = []
+    for _id in wins:
+        _name, _pos = WinPosInfo[_id]
+        x, y, w, h = _pos
+        if 'tilda' in _name:
+            h -= WinTitle
+            y += WinTitle
+        l.append([x, y, w, h])
+    return l
+
+
+def cycle(ANTI=False):
+    winlist = create_win_list()
+    lay = get_current_tile(winlist)
+    shift = -1 if ANTI else 1
+    winlist = winlist[shift:] + winlist[:shift]
+    arrange(lay, winlist)
+
+    active = get_active_window()
+    i0 = winlist.index(active)
+    i1 = (i0 + shift) % len(winlist)
+    raise_window(winlist[i1])
+
+
+def swap(target):
+    winlist = create_win_list()
+    active = get_active_window()
+    target = find(active, target, winlist)
+    if None == target:
+        return
+    i0 = winlist.index(active)
+    i1 = winlist.index(target)
+    lay = get_current_tile(winlist)
+    if False:
+        # 如果不重新排列所有窗口的话,改变tiling layout的时候会打乱顺序
+        arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
+    else:
+        winlist[i0], winlist[i1] = winlist[i1], winlist[i0]
+        arrange(lay, winlist)
+
+
+def find(center, target, winlist):
+    '''
+    find the nearest window in the target direction.
+    '''
+    lay = get_current_tile(winlist)
+    m = {w: l for w, l in zip(winlist, lay)}
+    lay_center = m[center]
+    _min = -1
+    _r = None
+    for w, l in zip(winlist, lay):
+        bias1, bias2 = 1.0, 1.0
+        bias = 4.0
+        if target == 'down':
+            delta = l[1] - lay_center[1]
+            bias1 = bias
+        if target == 'up':
+            delta = lay_center[1] - l[1]
+            bias1 = bias
+        if target == 'right':
+            delta = l[0] - lay_center[0]
+            bias2 = bias
+        if target == 'left':
+            delta = lay_center[0] - l[0]
+            bias2 = bias
+        distance = bias1 * (l[0] - lay_center[0])**2 + \
+            bias2 * (l[1] - lay_center[1])**2
+        if delta > 0:
+            if _min == -1 or distance < _min:
+                _min = distance
+                _r = w
+    return _r
+
+
+def focus(target):
     Windows = create_win_list()
-    arrange(get_simple_tile(len(Windows)),Windows)
-   
-
-def swap():
-    winlist = create_win_list()
     active = get_active_window()
-    winlist.remove(active)
-    winlist.insert(0,active)
-    arrange(get_simple_tile(len(winlist)),winlist)
+    target = find(active, target, Windows)
+    if None == target:
+        return
+    i1 = Windows.index(target)
+    raise_window(Windows[i1])
 
 
-def vertical():
+def minimize(wincount):
     winlist = create_win_list()
+    for win in winlist:
+        minimize_one(win)
+
+
+def maximize(wincount):
     active = get_active_window()
-    winlist.remove(active)
-    winlist.insert(0,active)
-    arrange(get_vertical_tile(len(winlist)),winlist)
+    maximize_one(active)
+    return None
 
+if __name__ == '__main__':
+    from docopt import docopt
+    arguments = docopt(__doc__)
 
-def horiz():
-    winlist = create_win_list()
-    active = get_active_window()
-    winlist.remove(active)
-    winlist.insert(0,active)
-    arrange(get_horiz_tile(len(winlist)),winlist)
+    for target in ('up', 'down', 'left', 'right'):
+        if arguments[target]:
+            break
 
-
-def cycle():
-    winlist = create_win_list()
-    winlist.insert(0,winlist[len(winlist)-1])
-    winlist = winlist[:-1]
-    arrange(get_simple_tile(len(winlist)),winlist)
-
-
-def maximize():
-    Width=MaxWidth
-    Height=MaxHeight - WinTitle -WinBorder
-    PosX=LeftPadding
-    PosY=TopPadding
-    move_active(PosX,PosY,Width,Height)
-    raise_window(":ACTIVE:")
-
-def max_all():
-    winlist = create_win_list()
-    active = get_active_window()
-    winlist.remove(active)
-    winlist.insert(0,active)
-    arrange(get_max_all(len(winlist)),winlist)
-
-
-
-if sys.argv[1] == "left":
-    left()
-elif sys.argv[1] == "right":
-    right()
-elif sys.argv[1] == "simple":
-    simple()
-elif sys.argv[1] == "vertical":
-    vertical()
-elif sys.argv[1] == "horizontal":
-    horiz()
-elif sys.argv[1] == "swap":
-    swap()
-elif sys.argv[1] == "cycle":
-    cycle()
-elif sys.argv[1] == "maximize":
-    maximize()
-elif sys.argv[1] == "max_all":
-    max_all()
-
+    if False:
+        pass
+    elif arguments['cycle']:
+        cycle()
+    elif arguments['anticycle']:
+        cycle(ANTI=True)
+    elif arguments['swap']:
+        swap(target)
+    elif arguments['focus']:
+        focus(target)
+    elif arguments['layout']:
+        assert not arguments['next'] == arguments['prev']
+        change_tile(ANTI=arguments['prev'])
