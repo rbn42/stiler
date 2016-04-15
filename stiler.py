@@ -263,7 +263,7 @@ def get_columns_tile2(wincount,reverse=False,cols=2):
         windowsleft -= rows
         rowheight= MaxHeight/ rows
         for row in range(rows):
-            layout.append((OrigX + colwidth * col, OrigY + row *
+            layout.append((OrigX + colwidth * col+WinBorder, OrigY + row *
                            rowheight, colwidth-2*WinBorder, rowheight - WinTitle - WinBorder))
     return layout[:wincount]
 # from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
