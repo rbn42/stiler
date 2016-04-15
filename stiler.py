@@ -44,8 +44,8 @@ def _exec_and_output(cmd):
 
 
 def _exec(cmd):
-    # print(cmd)
-    os.system(cmd)
+    #print(cmd)
+     os.system(cmd)
 
 BottomPadding = 20
 TopPadding = 20
@@ -83,7 +83,11 @@ def initialize():
         x, y = int(x), int(y)
         if host == 'N/A':
             continue
-        if name in ['<unknown>', 'x-nautilus-desktop', 'unity-launcher', 'unity-panel'] + ['Hud', 'unity-dash', 'Desktop', 'XdndCollectionWindowImp']:
+        if name in ['<unknown>', 'x-nautilus-desktop', 
+                'unity-launcher', 'unity-panel'] + ['Hud', 
+                        'unity-dash', 'Desktop', 
+                        'screenkey',
+                        'XdndCollectionWindowImp']:
             continue
         win_filtered_all.append(win)
         if x < 0 or x >= resx or y < 0 or y >= resy:
@@ -103,7 +107,12 @@ def initialize():
 
 
 def get_active_window():
-    return int(_exec_and_output("xdotool getactivewindow").split()[0])
+    active=int(_exec_and_output("xdotool getactivewindow").split()[0])
+    print(active)
+    print(WinList[Desktop])
+    if active not in WinList[Desktop]:
+        active=None
+    return active
 
 
 def store(object, file):
@@ -432,8 +441,11 @@ def find(center, target, winlist,posinfo):
     '''
     lay = get_current_tile(winlist,posinfo)
     cal_center =lambda x,y,w,h:[x+w/2.2,y+h/2.2]
-    m = {w:l for w, l in zip(winlist, lay)}
-    lay_center =cal_center(* m[center])
+    if None==center:
+        lay_center=MaxWidth/2.0,MaxHeight/2.0
+    else:
+        m = {w:l for w, l in zip(winlist, lay)}
+        lay_center =cal_center(* m[center])
     _min = -1
     _r = None
     for w, l in zip(winlist, lay):
