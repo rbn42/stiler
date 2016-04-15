@@ -9,7 +9,7 @@ sudo apt install python-docopt -y
 Commands
 =
 
-see
+See
 ```bash
 python stiler.py -h
 ```
