@@ -1,20 +1,20 @@
-这是在stiler.py的基础上修改的仿i3-wm的窗口导航工具
+A window tiling and navigation tool. I tried to imitate very basic functions of i3-wm.
 
-依赖
+Dependencies
 =
 ```bash
 sudo apt install python-docopt -y
 ```
 
-可用的指令
+Commands
 =
 
-见
+see
 ```bash
 python stiler.py -h
 ```
 
-推荐的键盘映射
+Recommended Keyboard Mapping
 =
 
 | Keys      | Command   |
@@ -30,11 +30,6 @@ python stiler.py -h
 |`<Super> l`    |  `python stiler.py focus right` |
 |`<Super> <Shift> l`    |  `python stiler.py swap right` |
 
-这里有一份从unity7中备份的配置
+This is a configuration file dumped for Unity7:
 [org.gnome.settings-daemon.plugins.media-keys](https://github.com/rbn42/home/blob/master/config/dconf/org.gnome.settings-daemon.plugins.media-keys)
 
-Layout
-=
-可用的Layout方面暂时没有设置成可配置选项.  
-我预设了几个个人觉得比较顺手的窗口布局,通过`stiler.py layout next`切换.  
-如果你需要不同的布局,请查找关键词:`TILES:可选的布局模式`调整源代码.也可以通过编写一个类似`get_simple_tile`的函数添加新的窗口布局.
