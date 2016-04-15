@@ -74,26 +74,31 @@ def initialize():
     resx, resy = int(x), int(y)
 
     win_output = _exec_and_output("wmctrl -lG").strip().split("\n")
-    win_list = {}
 
     win_filtered = []
+    win_filtered_all = []
     for win in win_output:
         _, _, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[0]
         x, y = int(x), int(y)
-        if x < 0 or x >= resx or y < 0 or y >= resy:
-            continue
         if host == 'N/A':
             continue
         if name in ['<unknown>', 'x-nautilus-desktop', 'unity-launcher', 'unity-panel'] + ['Hud', 'unity-dash', 'Desktop', 'XdndCollectionWindowImp']:
             continue
+        win_filtered_all.append(win)
+        if x < 0 or x >= resx or y < 0 or y >= resy:
+            continue
         win_filtered.append(win)
         # TODO 用xwininfo排除掉minimized窗口
 
+    win_list = {}
+    win_list_all = {}
     for desk in desk_list:
         win_list[desk] = [int(x.split()[0], 16)
                           for x in win_filtered if x.split()[1] == desk]
+        win_list_all[desk] = [int(x.split()[0], 16)
+                          for x in win_filtered_all if x.split()[1] == desk]
 
-    return (desktop, orig_x, orig_y, width, height, win_list, win_filtered)
+    return desktop, orig_x, orig_y, width, height, win_list,win_list_all, win_filtered,win_filtered_all
 
 
 def get_active_window():
@@ -113,7 +118,7 @@ def retrieve(file):
 
 
 (Desktop, OrigXstr, OrigYstr, MaxWidthStr,
- MaxHeightStr, WinList, WinPosInfo) = initialize()
+ MaxHeightStr, WinList,WinListAll, WinPosInfo,WinPosInfoAll) = initialize()
 MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
 MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
 OrigX = int(OrigXstr) + LeftPadding
@@ -127,6 +132,11 @@ WinPosInfo = {int(_id, 16): (_name, [int(x), int(y), int(
 for _id in WinPosInfo:
     WinPosInfo[_id][1][1] += -72 + 44
 
+WinPosInfoAll = [re.findall(r_wmctrl_lG, w)[0] for w in WinPosInfoAll]
+WinPosInfoAll = {int(_id, 16): (_name, [int(x), int(y), int(
+    w), int(h)]) for _id, _ws, x, y, w, h, _host, _name in WinPosInfoAll}
+for _id in WinPosInfoAll:
+    WinPosInfoAll[_id][1][1] += -72 + 44
 
 def get_simple_tile(wincount):
     rows = wincount - 1
@@ -348,8 +358,11 @@ def compare_win_list(newlist, oldlist):
     return templist
 
 
-def create_win_list():
-    Windows = WinList[Desktop]
+def create_win_list(_all=False):
+    if _all:
+        Windows = WinListAll[Desktop]
+    else:
+        Windows = WinList[Desktop]
 
 
     if OldWinList == {}:
@@ -373,10 +386,10 @@ def arrange(layout, windows):
     store(WinList, TempFile)
 
 
-def get_current_tile(wins):
+def get_current_tile(wins,posinfo):
     l = []
     for _id in wins:
-        _name, _pos = WinPosInfo[_id]
+        _name, _pos = posinfo[_id]
         x, y, w, h = _pos
         if 'tilda' in _name:
             h -= WinTitle
@@ -387,7 +400,7 @@ def get_current_tile(wins):
 
 def cycle(reverse=False):
     winlist = create_win_list()
-    lay = get_current_tile(winlist)
+    lay = get_current_tile(winlist,WinPosInfo)
     shift = -1 if reverse else 1
     winlist = winlist[shift:] + winlist[:shift]
     arrange(lay, winlist)
@@ -401,12 +414,12 @@ def cycle(reverse=False):
 def swap(target):
     winlist = create_win_list()
     active = get_active_window()
-    target = find(active, target, winlist)
+    target = find(active, target, winlist,WinPosInfo)
     if None == target:
         return
     i0 = winlist.index(active)
     i1 = winlist.index(target)
-    lay = get_current_tile(winlist)
+    lay = get_current_tile(winlist,WinPosInfo)
     if False:
         # 如果不重新排列所有窗口的话,改变tiling layout的时候会打乱顺序
         arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
@@ -415,11 +428,11 @@ def swap(target):
         arrange(lay, winlist)
 
 
-def find(center, target, winlist):
+def find(center, target, winlist,posinfo):
     '''
     find the nearest window in the target direction.
     '''
-    lay = get_current_tile(winlist)
+    lay = get_current_tile(winlist,posinfo)
     cal_center =lambda x,y,w,h:[x+w/2.2,y+h/2.2]
     m = {w:l for w, l in zip(winlist, lay)}
     lay_center =cal_center(* m[center])
@@ -459,9 +472,9 @@ def find(center, target, winlist):
 
 
 def focus(target):
-    Windows = create_win_list()
+    Windows = create_win_list(_all=True)
     active = get_active_window()
-    target = find(active, target, Windows)
+    target = find(active, target, Windows,WinPosInfoAll)
     if None == target:
         return
     i1 = Windows.index(target)
