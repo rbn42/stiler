@@ -1,12 +1,12 @@
 This is a window tiling and navigation tool based on wmctrl and xdotool. I tried to imitate the very basic functions of i3-wm.
 
-Dependencies
+Dependency
 =
 ```bash
 sudo apt install python-docopt -y
 ```
 
-Commands
+Usage
 =
 
 See
