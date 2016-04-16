@@ -439,6 +439,9 @@ def getkdtree(winlist, lay):
 
 
 def resize(resize_width, resize_height):
+    '''
+    Adjust non-overlapping layout.
+    '''
     winlist = create_win_list(WinList)
     lay = get_current_tile(winlist, WinPosInfo)
     active = get_active_window()
@@ -483,6 +486,50 @@ def resize(resize_width, resize_height):
     a, b = (getLayoutAndKey(_tree))
     arrange(a, b)
 
+def swap_kdtree(target):
+    '''
+    Adjust non-overlapping layout.
+    '''
+
+    active = get_active_window()
+    if None==active:
+        return True
+
+    winlist = create_win_list(WinList)
+    lay = get_current_tile(winlist, WinPosInfo)
+    _tree, _map = getkdtree(winlist, lay)
+    current_node=_map[active]
+
+    if len(current_node.path) % 2 == 0:
+        promote = target in ['right','left']
+    else:   
+        promote = target in ['down','up']
+    if promote:
+        shift=0 if target in ['left','up'] else 1
+        current_node.parent.children.remove(current_node)   
+        regularize_node=current_node.parent.parent
+        index_parent=regularize_node.children.index(current_node.parent)
+        regularize_node.children.insert(index_parent+shift,current_node)
+    else:
+        shift=-1 if target in ['left','up'] else 0
+        regularize_node=current_node.parent
+        index_current=regularize_node.children.index(current_node)
+        regularize_node.children.remove(current_node)
+        new_parent=regularize_node.children[index_current+shift]
+        if new_parent.leaf:
+            from kdtree import create_parent
+            new_parent=create_parent(new_parent)
+        new_parent.children.append(current_node)
+
+
+    # regularize k-d tree
+    from kdtree import regularize
+    regularize(regularize_node,border=(2*WinBorder,WinBorder+WinTitle))
+    # reload k-d tree
+    from kdtree import getLayoutAndKey
+    a, b = (getLayoutAndKey(regularize_node))
+    arrange(a, b)
+    return True
 
 def swap(target):
     winlist = create_win_list(WinList)
@@ -540,7 +587,6 @@ def find(center, target, winlist, posinfo):
             bias2 = bias
         distance = bias1 * (l[0] - lay_center[0])**2 + \
             bias2 * (l[1] - lay_center[1])**2
-        print(delta, delta2)
         if delta > 0 and delta2 > 0:
             if _min == -1 or distance < _min:
                 _min = distance
@@ -598,6 +644,7 @@ if __name__ == '__main__':
     elif arguments['anticycle']:
         cycle(reverse=True)
     elif arguments['swap']:
+        #if swap_kdtree(target):
         swap(target)
     elif arguments['focus']:
         focus(target)
