@@ -22,8 +22,9 @@
 Tiling window on any window manager. 
 
 Usage:
-  stiler.py (focus|swap) (up|down|left|right)
   stiler.py layout (next|prev)
+  stiler.py (focus|swap) (up|down|left|right)
+  stiler.py (grow|shrink) (height|width)
   stiler.py cycle 
   stiler.py anticycle 
   stiler.py -h | --help
@@ -146,6 +147,8 @@ WinPosInfoAll = {int(_id, 16): (_name, [int(x), int(y), int(
 for _id in WinPosInfoAll:
     WinPosInfoAll[_id][1][1] += -72 + 44
 
+WinPosInfo = WinPosInfoAll
+
 
 def get_simple_tile(wincount):
     MwFactor = 0.55
@@ -197,7 +200,7 @@ def change_tile(reverse=False):
         TILES = ['col2_l', 'col2_r']
     if len(winlist) > 3:
         TILES.append('simple')
-    if len(winlist)>1:
+    if len(winlist) > 1:
         TILES.append('col1')
     TILES.append('maximize')
 
@@ -422,6 +425,65 @@ def cycle(reverse=False):
     raise_window(winlist[i1])
 
 
+def getkdtree(winlist, lay):
+    from kdtree import kdtree
+    tolerance = 0.0
+    t = tolerance
+    dy = 10
+    sw, sh = 1920 * 10, 1080 * 10
+    origin_lay = [[x, y, x + w, y + h] for x, y, w, h in lay]
+    normalized = [[(x + t) / sw, (y + dy + t) / sh, (x + w - t) /
+                   sw, (y + dy + h - t) / sh] for x, y, w, h in lay]
+    _tree, _map = kdtree(zip(normalized, winlist, origin_lay))
+    return _tree, _map
+
+
+def resize(resize_width, resize_height):
+    winlist = create_win_list(WinList)
+    lay = get_current_tile(winlist, WinPosInfo)
+    active = get_active_window()
+    if None==active:
+        return
+    _tree, _map = getkdtree(winlist, lay)
+    current_node=_map[active]
+
+    if len(current_node.path) % 2 == 0:
+        resize_current=resize_height
+        resize_parent=resize_width
+        index_current=3
+        index_parent=2
+    else:
+        resize_current=resize_width
+        resize_parent=resize_height
+        index_current=2
+        index_parent=3
+
+    regularize_node=None
+
+    if not resize_current==0:
+        if not current_node.overlap  :
+            if not None==current_node.parent:
+                current_node.modified = True
+                current_node.position[index_current] += resize_current
+                regularize_node=current_node.parent
+    if not resize_parent==0:
+        if not None==current_node.parent :
+            if not current_node.parent.overlap:
+                if not None== current_node.parent.parent:
+                    current_node.parent.modified = True
+                    current_node.parent.position[index_parent] += resize_parent
+                    regularize_node=current_node.parent.parent
+
+
+    # regularize k-d tree
+    from kdtree import regularize
+    regularize(regularize_node,border=(2*WinBorder,WinBorder+WinTitle))
+    # reload k-d tree
+    from kdtree import getLayoutAndKey
+    a, b = (getLayoutAndKey(_tree))
+    arrange(a, b)
+
+
 def swap(target):
     winlist = create_win_list(WinList)
     lay = get_current_tile(winlist, WinPosInfo)
@@ -542,3 +604,13 @@ if __name__ == '__main__':
     elif arguments['layout']:
         assert not arguments['next'] == arguments['prev']
         change_tile(reverse=arguments['prev'])
+    elif arguments['grow']:
+        if arguments['width']:
+            resize(20, 0)
+        else:
+            resize(0, 20)
+    elif arguments['shrink']:
+        if arguments['width']:
+            resize(-20, 0)
+        else:
+            resize(0, -20)

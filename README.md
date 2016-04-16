@@ -29,6 +29,10 @@ Recommended Keyboard Mapping
 |`<Super> <Shift> k`    |  `python stiler.py swap up` |
 |`<Super> l`    |  `python stiler.py focus right` |
 |`<Super> <Shift> l`    |  `python stiler.py swap right` |
+|`<Super> <Ctrl> h`    |  `python stiler.py shrink width` |
+|`<Super> <Ctrl> j`    |  `python stiler.py grow height ` |
+|`<Super> <Ctrl> k`    |  `python stiler.py shrink height ` |
+|`<Super> <Ctrl> l`    |  `python stiler.py grow width ` |
 
 Here is a configuration file dumped for Unity7:
 [org.gnome.settings-daemon.plugins.media-keys](https://github.com/rbn42/home/blob/master/config/dconf/org.gnome.settings-daemon.plugins.media-keys)
