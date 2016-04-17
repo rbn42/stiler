@@ -1,9 +1,12 @@
-BottomPadding = 10
-TopPadding = 10
-LeftPadding = 10
-RightPadding = 10
+BottomPadding = 2
+TopPadding = BottomPadding
+LeftPadding = BottomPadding
+RightPadding = BottomPadding
 WinTitle = 28
 WinBorder = 5
 NavigateAcrossWorkspaces = True  # TODO availabe in Unity7
 TempFile = "/dev/shm/.stiler_db"
 LockFile = "/dev/shm/.stiler.lock"
+NOTITLE=['tilda']
+EXCLUDE_APPLICATIONS=['<unknown>', 'x-nautilus-desktop','unity-launcher', 'unity-panel'] + ['Hud','unity-dash', 'Desktop','screenkey','XdndCollectionWindowImp']
+RESIZE_STEP=20
