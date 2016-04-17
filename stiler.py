@@ -206,7 +206,9 @@ def change_tile(reverse=False):
     TILES.append('maximize')
 
     # TODO unable to compare windows's numbers between different workspaces
-    if not len(winlist) == len(OldWinList[Desktop]):
+    if None==OldWinList.get(Desktop,None):
+        shift = 0
+    elif not len(winlist) == len(OldWinList[Desktop]):
         shift = 0
     elif reverse:
         shift = - 1
