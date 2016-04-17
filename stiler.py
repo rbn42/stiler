@@ -449,13 +449,25 @@ def getkdtree(winlist, lay):
 def resize(resize_width, resize_height):
     if resize_kdtree(resize_width,resize_height):
         return True
+    return moveandresize([0,0,resize_width,resize_height])
+
+def move(target):
+    if move_kdtree(target):
+        return True
+    target={'left':[-config.MOVE_STEP,0,0,0],
+            'down':[0,config.MOVE_STEP,0,0],
+            'up':[0,-config.MOVE_STEP,0,0],
+            'right':[config.MOVE_STEP,0,0,0],}[target]
+    return moveandresize(target)
+
+def moveandresize(target):
     active = get_active_window()
-    # can find target window
+    # cannot find target window
     if None == active:
         return False
     lay = get_current_tile([active], WinPosInfo)[0]
-    lay[2]+=resize_width
-    lay[3]+=resize_height
+    for i in range(4):
+        lay[i]+=target[i]
     move_window(active,*lay)
     return True
 
@@ -543,12 +555,12 @@ def move_kdtree(target):
     active = get_active_window()
     # can find target window
     if None == active:
-        return True
+        return False
 
     winlist = create_win_list(WinList)
     # ignore layouts with less than 2 windows
     if len(winlist) < 2:
-        return True
+        return False
 
     lay = get_current_tile(winlist, WinPosInfo)
     # generate k-d tree
@@ -805,8 +817,7 @@ if __name__ == '__main__':
     elif arguments['swap']:
         swap(target)
     elif arguments['move']:
-        if not move_kdtree(target):
-            swap(target)
+        move(target)
     elif arguments['focus']:
         if not focus(target):
             focus_kdtree(target)
