@@ -1,5 +1,7 @@
 This is a window tiling and navigation tool based on wmctrl and xdotool. I tried to imitate the very basic functions of i3-wm.
 
+![alt tag](https://raw.githubusercontent.com/wiki/rbn42/stiler/show.gif)
+
 Dependency
 =
 ```bash
