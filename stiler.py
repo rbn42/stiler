@@ -433,16 +433,29 @@ def cycle(reverse=False):
 
 
 def getkdtree(winlist, lay):
-    from kdtree import kdtree
+    # begin "normalize positions"
+    '''
+    The kdtree function only accept values between 0 and 1.
+    '''
     tolerance = 0.0
     t = tolerance
     dy = 10
-    sw, sh = 1920 * 10, 1080 * 10
-    origin_lay = [[x, y, x + w, y + h] for x, y, w, h in lay]
+    sw, sh = 2000 * 10, 1000 * 10
     normalized = [[(x + t) / sw, (y + dy + t) / sh, (x + w - t) /
                    sw, (y + dy + h - t) / sh] for x, y, w, h in lay]
-    _tree, _map = kdtree(zip(normalized, winlist, origin_lay))
+    # end "normalize positions"
 
+    # begin "generate k-d tree"
+    origin_lay = [[x, y, x + w, y + h] for x, y, w, h in lay]
+    from kdtree import kdtree
+    _tree, _map = kdtree(zip(normalized, winlist, origin_lay))
+    # end "generate k-d tree"
+
+    # begin "reload old root"
+    '''
+    wmctrl cannot resize some applications precisely, like gnome-terminal. The side effect is that the overall window size decreases.
+    Reloading old root node position somehow helps prevent these windows shrink too much over time. When the k-d tree is regularized, the size of the root node will be passed to leaves.
+    '''
     p1 = _tree.position
     p2 = data_temp.get('overall_position', None)
     if not None == p2:
@@ -456,9 +469,11 @@ def getkdtree(winlist, lay):
         data_temp['overall_position'] = [i for i in p1]
         store(data_temp)
     else:
+        # Root nodes
         _tree.position = [i for i in p2]
         _tree.children[0].position = [i for i in p2]
         _tree.children[0].children[0].position = [i for i in p2]
+    # end "reload old root"
     return _tree, _map
 
 
@@ -466,17 +481,23 @@ def resize(resize_width, resize_height):
     '''
     Adjust non-overlapping layout.
     '''
+
     winlist = create_win_list(WinList)
+    # ignore layouts with less than 2 windows
     if len(winlist) < 2:
         return True
 
-    lay = get_current_tile(winlist, WinPosInfo)
     active = get_active_window()
+    # can find target window
     if None == active:
         return
+
+    lay = get_current_tile(winlist, WinPosInfo)
+    # generate k-d tree
     _tree, _map = getkdtree(winlist, lay)
     current_node = _map[active]
 
+    # determine the size of current node and parent node.
     if len(current_node.path) % 2 == 0:
         resize_current = resize_height
         resize_parent = resize_width
@@ -490,6 +511,7 @@ def resize(resize_width, resize_height):
 
     regularize_node = None
 
+    # resize nodes
     if not resize_current == 0:
         if not current_node.overlap:
             if not None == current_node.parent:
@@ -508,7 +530,8 @@ def resize(resize_width, resize_height):
     regularize_node = regularize_node.parent
     from kdtree import regularize
     regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
-    # reload k-d tree
+
+    # load k-d tree
     from kdtree import getLayoutAndKey
     a, b = (getLayoutAndKey(_tree))
     arrange(a, b)
@@ -520,22 +543,27 @@ def move_kdtree(target):
     '''
 
     active = get_active_window()
+    # can find target window
     if None == active:
         return True
 
     winlist = create_win_list(WinList)
+    # ignore layouts with less than 2 windows
     if len(winlist) < 2:
         return True
 
     lay = get_current_tile(winlist, WinPosInfo)
+    # generate k-d tree
     _tree, _map = getkdtree(winlist, lay)
     current_node = _map[active]
 
+    # whether promote node to its parent's level
     if len(current_node.path) % 2 == 0:
         promote = target in ['right', 'left']
     else:
         promote = target in ['down', 'up']
     shift = 0 if target in ['left', 'up'] else 1
+
     if promote:
         current_node.parent.children.remove(current_node)
         regularize_node = current_node.parent.parent
@@ -545,8 +573,12 @@ def move_kdtree(target):
         regularize_node = current_node.parent
         index_current = regularize_node.children.index(current_node)
         regularize_node.children.remove(current_node)
+        '''
+        If there is no more nodes at the target direction, promote the current node.
+        '''
         if 0 <= index_current - 1 + shift < len(regularize_node.children):
 
+            #If there are is only one sibling node, promote them both.
             if len(regularize_node.children) == 1:
                 #
                 shift = -1 if target in ['left', 'up'] else 1
@@ -555,10 +587,12 @@ def move_kdtree(target):
             else:
                 new_parent = regularize_node.children[
                     index_current - 1 + shift]
+                #If there is a leaf node at the target direction, build a new parent node for the leaf node and the current node.
                 if new_parent.leaf:
-                    # allow no more than one branch for each node
+                    #But allow no more than one branch for each node
                     for sibling in new_parent.parent.children:
                         if not sibling.leaf:
+                            #Just swap them.
                             shift = -1 if target in ['left', 'up'] else 1
                             regularize_node.children.insert(
                                 index_current + shift, current_node)
@@ -570,6 +604,7 @@ def move_kdtree(target):
                 else:
                     new_parent.children.append(current_node)
         else:
+            #promote the current node.
             regularize_node = current_node.parent.parent.parent
             index_current = regularize_node.children.index(
                 current_node.parent.parent)
@@ -578,9 +613,10 @@ def move_kdtree(target):
 
         if len(regularize_node.children) == 1:
             regularize_node = regularize_node.parent
+
+    #remove nodes which has only one child
     from kdtree import remove_single_child_node
     remove_single_child_node(regularize_node)
-    # remove_single_child_node(regularize_node)
 
     if regularize_node.overlap:
         return False
@@ -588,7 +624,7 @@ def move_kdtree(target):
     regularize_node = regularize_node.parent
     from kdtree import regularize
     regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
-    # reload k-d tree
+    # load k-d tree
     from kdtree import getLayoutAndKey
     a, b = getLayoutAndKey(regularize_node, min_width=1, min_height=1)
     arrange(a, b)
