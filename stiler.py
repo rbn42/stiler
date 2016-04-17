@@ -37,6 +37,7 @@ import os
 import re
 import subprocess
 import time
+from config import *
 
 
 def _exec_and_output(cmd):
@@ -48,15 +49,6 @@ def _exec(cmd):
     # print(cmd)
     os.system(cmd)
 
-BottomPadding = 20
-TopPadding = 20
-LeftPadding = 20
-RightPadding = 20
-WinTitle = 28
-WinBorder = 5
-NavigateAcrossWorkspaces = True  # TODO availabe in Unity7
-TempFile = "/dev/shm/.stiler_db"
-LockFile = "/dev/shm/.stiler.lock"
 
 r_wmctrl_lG = '^([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(.+)$'
 r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
@@ -467,7 +459,7 @@ def getkdtree(winlist, lay):
     if None == p2:
         data_temp['overall_position'] = [i for i in p1]
         store(data_temp)
-    elif p1[0] > p2[0] or p1[1] > p2[1] or p1[2] < p2[2] or p1[3] < p2[3]:
+    elif p1[0] < p2[0] or p1[1] < p2[1] or p1[2] > p2[2] or p1[3] > p2[3]:
         data_temp['overall_position'] = [i for i in p1]
         store(data_temp)
     else:
@@ -811,7 +803,7 @@ if __name__ == '__main__':
         if not move_kdtree(target):
             swap(target)
     elif arguments['focus']:
-        if not focus_kdtree(target):
+    #    if not focus_kdtree(target):
             focus(target)
     elif arguments['layout']:
         assert not arguments['next'] == arguments['prev']
