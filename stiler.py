@@ -23,7 +23,7 @@ Tiling window on any window manager.
 
 Usage:
   stiler.py layout (next|prev)
-  stiler.py (focus|swap) (up|down|left|right)
+  stiler.py (focus|move|swap) (up|down|left|right)
   stiler.py (grow|shrink) (height|width)
   stiler.py cycle 
   stiler.py anticycle 
@@ -56,6 +56,7 @@ WinTitle = 28
 WinBorder = 5
 NavigateAcrossWorkspaces = True  # TODO availabe in Unity7
 TempFile = "/dev/shm/.stiler_db"
+LockFile="/dev/shm/.stiler.lock"
 
 r_wmctrl_lG = '^([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(.+)$'
 r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
@@ -347,6 +348,11 @@ def move_window(windowid, x, y, w, h):
         h += WinTitle
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
+    #command='xdotool windowmove  %d %d %d' %(windowid,x,y)
+    #print(command)
+    #command='xdotool windowsize  %d %d %d' %(windowid,w,h)
+    #print(command)
+    #_exec(command)
     #command = "wmctrl -i -r " + windowid + " -b remove,hidden,shaded"
 #    _exec(command)
 #    command = 'xdotool windowmap "%s"' % windowid
@@ -479,6 +485,7 @@ def resize(resize_width, resize_height):
 
 
     # regularize k-d tree
+    regularize_node=regularize_node.parent
     from kdtree import regularize
     regularize(regularize_node,border=(2*WinBorder,WinBorder+WinTitle))
     # reload k-d tree
@@ -486,7 +493,7 @@ def resize(resize_width, resize_height):
     a, b = (getLayoutAndKey(_tree))
     arrange(a, b)
 
-def swap_kdtree(target):
+def move_kdtree(target):
     '''
     Adjust non-overlapping layout.
     '''
@@ -496,6 +503,9 @@ def swap_kdtree(target):
         return True
 
     winlist = create_win_list(WinList)
+    if len(winlist)<2:
+        return True
+
     lay = get_current_tile(winlist, WinPosInfo)
     _tree, _map = getkdtree(winlist, lay)
     current_node=_map[active]
@@ -504,30 +514,55 @@ def swap_kdtree(target):
         promote = target in ['right','left']
     else:   
         promote = target in ['down','up']
+    shift=0 if target in ['left','up'] else 1
     if promote:
-        shift=0 if target in ['left','up'] else 1
         current_node.parent.children.remove(current_node)   
         regularize_node=current_node.parent.parent
         index_parent=regularize_node.children.index(current_node.parent)
         regularize_node.children.insert(index_parent+shift,current_node)
     else:
-        shift=-1 if target in ['left','up'] else 0
         regularize_node=current_node.parent
         index_current=regularize_node.children.index(current_node)
         regularize_node.children.remove(current_node)
-        new_parent=regularize_node.children[index_current+shift]
-        if new_parent.leaf:
-            from kdtree import create_parent
-            new_parent=create_parent(new_parent)
-        new_parent.children.append(current_node)
+        if 0<=index_current-1+shift<len(regularize_node.children):
+
+            if len(regularize_node.children)==1:
+                shift=-1 if target in ['left','up'] else 1
+                regularize_node.children.insert(index_current+shift,current_node)
+            else:
+                new_parent=regularize_node.children[index_current-1+shift]
+                if new_parent.leaf:
+                    for sibling in new_parent.parent.children:
+                        if not sibling.leaf:
+                            shift=-1 if target in ['left','up'] else 1
+                            regularize_node.children.insert(index_current+shift,current_node)
+                            break
+                    else:
+                        from kdtree import create_parent
+                        new_parent=create_parent(new_parent)
+                        new_parent.children.append(current_node)
+                else:   
+                    new_parent.children.append(current_node)
+        else:
+            regularize_node=current_node.parent.parent.parent
+            index_current=regularize_node.children.index(current_node.parent.parent)
+            regularize_node.children.insert(index_current+shift,current_node)
+
+        if  len(regularize_node.children)==1:
+            regularize_node=regularize_node.parent
+    from kdtree import remove_single_child_node
+    remove_single_child_node(regularize_node)
+        #remove_single_child_node(regularize_node)
 
 
+    if regularize_node.overlap:
+        return False
     # regularize k-d tree
     from kdtree import regularize
     regularize(regularize_node,border=(2*WinBorder,WinBorder+WinTitle))
     # reload k-d tree
     from kdtree import getLayoutAndKey
-    a, b = (getLayoutAndKey(regularize_node))
+    a, b = getLayoutAndKey(regularize_node,min_width=1,min_height=1)
     arrange(a, b)
     return True
 
@@ -611,6 +646,46 @@ def focus(target):
     i1 = Windows.index(target)
     raise_window(Windows[i1])
 
+def focus_kdtree(target):
+    '''
+    Adjust non-overlapping layout.
+    '''
+
+    active = get_active_window()
+    if None==active:
+        return False
+
+    winlist = create_win_list(WinList)
+    lay = get_current_tile(winlist, WinPosInfo)
+    _tree, _map = getkdtree(winlist, lay)
+    current_node=_map[active]
+
+    if len(current_node.path) % 2 == 0:
+        promote = target in ['right','left']
+    else:   
+        promote = target in ['down','up']
+
+    shift=-1 if target in ['left','up'] else 1
+
+    c=current_node
+    if promote:
+        c=c.parent
+
+    while True:
+        i=c.parent.children.index(c)
+        if 0<=i+shift<len(c.parent.children):
+            target=c.parent.children[i+shift]
+            break
+        if None==c.parent.parent or None==c.parent.parent.parent:
+            return False
+        c=c.parent.parent
+
+    if None==target or target.overlap:
+        return False
+    else:
+        raise_window(target.key)
+        return True
+
 
 def minimize(wincount):
     winlist = create_win_list(WinList)
@@ -629,7 +704,24 @@ def maximize(wincount):
     maximize_one(active)
     return None
 
+def lock(_file,wait=0.5):
+    t0=0
+    if os.path.exists(_file):
+        t0=float(open(_file).read())
+    t1=time.time()
+    if t1<t0+wait:
+        return False
+    f=open(_file,'w')
+    f.write(str(t1))
+    f.close()
+    return True
+def unlock(_file):
+    os.remove(_file)
+
+
+
 if __name__ == '__main__':
+    lock(LockFile)
     from docopt import docopt
     arguments = docopt(__doc__)
 
@@ -644,10 +736,13 @@ if __name__ == '__main__':
     elif arguments['anticycle']:
         cycle(reverse=True)
     elif arguments['swap']:
-        #if swap_kdtree(target):
         swap(target)
+    elif arguments['move']:
+        if not move_kdtree(target):
+            swap(target)
     elif arguments['focus']:
-        focus(target)
+        if not focus_kdtree(target):
+            focus(target)
     elif arguments['layout']:
         assert not arguments['next'] == arguments['prev']
         change_tile(reverse=arguments['prev'])
@@ -661,3 +756,4 @@ if __name__ == '__main__':
             resize(-20, 0)
         else:
             resize(0, -20)
+    unlock(LockFile)
