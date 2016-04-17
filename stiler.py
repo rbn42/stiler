@@ -446,8 +446,20 @@ def getkdtree(winlist, lay):
     # end "reload old root"
     return _tree, _map
 
-
 def resize(resize_width, resize_height):
+    if resize_kdtree(resize_width,resize_height):
+        return True
+    active = get_active_window()
+    # can find target window
+    if None == active:
+        return False
+    lay = get_current_tile([active], WinPosInfo)[0]
+    lay[2]+=resize_width
+    lay[3]+=resize_height
+    move_window(active,*lay)
+    return True
+
+def resize_kdtree(resize_width, resize_height):
     '''
     Adjust non-overlapping layout.
     '''
@@ -455,12 +467,12 @@ def resize(resize_width, resize_height):
     winlist = create_win_list(WinList)
     # ignore layouts with less than 2 windows
     if len(winlist) < 2:
-        return True
+        return False
 
     active = get_active_window()
     # can find target window
     if None == active:
-        return
+        return False
 
     lay = get_current_tile(winlist, WinPosInfo)
     # generate k-d tree
@@ -496,6 +508,8 @@ def resize(resize_width, resize_height):
                     current_node.parent.position[index_parent] += resize_parent
                     regularize_node = current_node.parent.parent
 
+    if None==regularize_node:
+        return False
     # regularize k-d tree
     regularize_node = regularize_node.parent
     from kdtree import regularize
@@ -505,6 +519,7 @@ def resize(resize_width, resize_height):
     from kdtree import getLayoutAndKey
     a, b = (getLayoutAndKey(_tree))
     arrange(a, b)
+    return True
 
 
 def move_kdtree(target):
