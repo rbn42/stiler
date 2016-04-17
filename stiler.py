@@ -497,16 +497,29 @@ def resize_kdtree(resize_width, resize_height):
     if not resize_current == 0:
         if not current_node.overlap:
             if not None == current_node.parent:
-                current_node.modified = True
-                current_node.position[index_current] += resize_current
-                regularize_node = current_node.parent
+                node=current_node
+                index=index_current
+                node.modified = True
+                regularize_node = node.parent
+                #invert the operation if the node is the last child of its parent
+                if regularize_node.children[-1]==node:
+                    node.position[index] -= resize_current
+                else:
+                    node.position[index] += resize_current
+
     if not resize_parent == 0:
         if not None == current_node.parent:
             if not current_node.parent.overlap:
                 if not None == current_node.parent.parent:
-                    current_node.parent.modified = True
-                    current_node.parent.position[index_parent] += resize_parent
-                    regularize_node = current_node.parent.parent
+                    node=current_node.parent
+                    index=index_parent
+                    node.modified = True
+                    regularize_node = node.parent
+                    #invert the operation if the node is the last child of its parent
+                    if regularize_node.children[-1]==node:
+                        node.position[index] -= resize_current
+                    else:
+                        node.position[index] += resize_current
 
     if None==regularize_node:
         return False
