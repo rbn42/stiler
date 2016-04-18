@@ -681,7 +681,8 @@ def move_kdtree(target,allow_create_new_node=True):
 
 def swap(target):
 
-    winlist = WinList[Desktop]
+    winlist = create_win_list(WinList)
+    #winlist = WinList[Desktop]
     active = get_active_window()
 
     if None == active:
@@ -706,7 +707,9 @@ def swap(target):
     lay = get_current_tile(winlist, WinPosInfo)
     arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
 
+    print(winlist)
     winlist[i0], winlist[i1] = winlist[i1], winlist[i0]
+    print(winlist)
     WinList[Desktop] = winlist
     PERSISTENT_DATA['winlist'] = WinList
     store()
