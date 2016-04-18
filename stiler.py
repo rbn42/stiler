@@ -514,13 +514,14 @@ def resize_kdtree(resize_width, resize_height):
             if not None == current_node.parent:
                 node=current_node
                 index=index_current
+                _resize=resize_current
                 node.modified = True
                 regularize_node = node.parent
                 #invert the operation if the node is the last child of its parent
                 if regularize_node.children[-1]==node:
-                    node.position[index] -= resize_current
+                    node.position[index] -= _resize
                 else:
-                    node.position[index] += resize_current
+                    node.position[index] += _resize
 
     if not resize_parent == 0:
         if not None == current_node.parent:
@@ -528,13 +529,14 @@ def resize_kdtree(resize_width, resize_height):
                 if not None == current_node.parent.parent:
                     node=current_node.parent
                     index=index_parent
+                    _resize=resize_parent
                     node.modified = True
                     regularize_node = node.parent
                     #invert the operation if the node is the last child of its parent
                     if regularize_node.children[-1]==node:
-                        node.position[index] -= resize_current
+                        node.position[index] -= _resize
                     else:
-                        node.position[index] += resize_current
+                        node.position[index] += _resize
 
     if None==regularize_node:
         return False
