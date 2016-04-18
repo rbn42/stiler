@@ -144,20 +144,19 @@ def get_simple_tile(wincount):
     rows = wincount - 1
     layout = []
     if rows == 0:
-        layout.append(
-            (OrigX, OrigY, MaxWidth, MaxHeight - WinTitle - WinBorder))
+        layout.append(layout_shift(0,0,MaxWidth,MaxHeight))
         return layout
     else:
-        layout.append((OrigX, OrigY, int(MaxWidth * MwFactor),
-                       MaxHeight - WinTitle - WinBorder))
+        layout.append(layout_shift(0, 0, int(MaxWidth * MwFactor),
+                       MaxHeight ))
 
-    x = OrigX + int((MaxWidth * MwFactor) + (2 * WinBorder))
-    width = int((MaxWidth * (1 - MwFactor)) - 2 * WinBorder)
-    height = int(MaxHeight / rows - WinTitle - WinBorder)
+    x =  int((MaxWidth * MwFactor) )
+    width = int((MaxWidth * (1 - MwFactor)) )
+    height = int(MaxHeight / rows  )
 
     for n in range(0, rows):
-        y = OrigY + int((MaxHeight / rows) * (n))
-        layout.append((x, y, width, height))
+        y =  int((MaxHeight / rows) * (n))
+        layout.append(layout_shift(x, y, width, height))
 
     return layout
 
@@ -261,8 +260,8 @@ def get_autogrid_tile(wincount):
         windowsleft -= cols
         colwidth = MaxWidth / cols
         for col in range(cols):
-            layout.append((OrigX + colwidth * col, OrigY + row *
-                           rowheight, colwidth, rowheight - WinTitle - WinBorder))
+            layout.append(layout_shift(colwidth * col,row *
+                           rowheight, colwidth, rowheight))
     return layout[:wincount]
 # end https://bbs.archlinux.org/viewtopic.php?id=64100&p=6  #150
 
@@ -282,9 +281,14 @@ def get_columns_tile2(wincount, reverse=False, cols=2):
         windowsleft -= rows
         rowheight = MaxHeight / rows
         for row in range(rows):
-            layout.append((OrigX + colwidth * col + WinBorder, OrigY + row *
-                           rowheight, colwidth - 2 * WinBorder, rowheight - WinTitle - WinBorder))
+            layout.append(layout_shift(
+                colwidth * col , 
+                row *rowheight,
+                colwidth,
+                rowheight ))
     return layout[:wincount]
+def layout_shift(x,y,w,h):
+    return OrigX+x+WinBorder,OrigY+y+WinBorder,w-2*WinBorder,h-WinTitle-2*WinBorder
 # from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
 
 
@@ -440,9 +444,10 @@ def getkdtree(winlist, lay):
         store()
     else:
         # Root nodes
-        _tree.position = [i for i in p2]
-        _tree.children[0].position = [i for i in p2]
-        _tree.children[0].children[0].position = [i for i in p2]
+        pass
+        #_tree.position = [i for i in p2]
+        #_tree.children[0].position = [i for i in p2]
+        #_tree.children[0].children[0].position = [i for i in p2]
     # end "reload old root"
     return _tree, _map
 
@@ -452,7 +457,9 @@ def resize(resize_width, resize_height):
     return moveandresize([0,0,resize_width,resize_height])
 
 def move(target):
-    if move_kdtree(target):
+    if move_kdtree(target,allow_create_new_node=True):
+        return True
+    if move_kdtree(target,allow_create_new_node=False):
         return True
     target={'left':[-config.MOVE_STEP,0,0,0],
             'down':[0,config.MOVE_STEP,0,0],
@@ -549,7 +556,7 @@ def resize_kdtree(resize_width, resize_height):
     return True
 
 
-def move_kdtree(target):
+def move_kdtree(target,allow_create_new_node=True):
     '''
     Adjust non-overlapping layout.
     '''
@@ -601,19 +608,21 @@ def move_kdtree(target):
                     index_current - 1 + shift]
                 # If there is a leaf node at the target direction, build a new
                 # parent node for the leaf node and the current node.
-                if new_parent.leaf:
+                _swap=False or not allow_create_new_node
+                if new_parent.leaf and not _swap:
                     # But allow no more than one branch for each node
                     for sibling in new_parent.parent.children:
-                        if not sibling.leaf:
+                        if not sibling.leaf :
                             # Just swap them.
-                            shift = -1 if target in ['left', 'up'] else 1
-                            regularize_node.children.insert(
-                                index_current + shift, current_node)
+                            _swap=True
                             break
                     else:
-                        from kdtree import create_parent
-                        new_parent = create_parent(new_parent)
-                        new_parent.children.append(current_node)
+                            from kdtree import create_parent
+                            new_parent = create_parent(new_parent)
+                if _swap:
+                    shift = -1 if target in ['left', 'up'] else 1
+                    regularize_node.children.insert(
+                        index_current + shift, current_node)
                 else:
                     new_parent.children.append(current_node)
         else:
@@ -636,10 +645,12 @@ def move_kdtree(target):
     # regularize k-d tree
     regularize_node = regularize_node.parent
     from kdtree import regularize
-    regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
+    regularize(regularize_node, border=(2 * WinBorder, 2*WinBorder + WinTitle))
     # load k-d tree
     from kdtree import getLayoutAndKey
-    a, b = getLayoutAndKey(regularize_node, min_width=1, min_height=1)
+    a, b,reach_size_limit = getLayoutAndKey(regularize_node, min_width=1, min_height=1)
+    if reach_size_limit:
+        return False
     arrange(a, b)
     return True
 
@@ -725,7 +736,7 @@ def focus(target):
     return True
 
 
-def focus_kdtree(target):
+def focus_kdtree(target,allow_parent=True):
     '''
     Adjust non-overlapping layout.
     '''
@@ -744,6 +755,9 @@ def focus_kdtree(target):
     else:
         promote = target in ['down', 'up']
 
+    if promote and not allow_parent:
+        return False
+
     shift = -1 if target in ['left', 'up'] else 1
 
     c = current_node
@@ -756,6 +770,8 @@ def focus_kdtree(target):
             target = c.parent.children[i + shift]
             break
         if None == c.parent.parent or None == c.parent.parent.parent:
+            return False
+        if not allow_parent:
             return False
         c = c.parent.parent
 
@@ -821,8 +837,9 @@ if __name__ == '__main__':
     elif arguments['move']:
         move(target)
     elif arguments['focus']:
-        if not focus(target):
-            focus_kdtree(target)
+        if not focus_kdtree(target,allow_parent=False):
+            if not focus(target):
+                focus_kdtree(target,allow_parent=True)
 
     elif arguments['layout']:
         assert not arguments['next'] == arguments['prev']
