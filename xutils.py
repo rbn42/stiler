@@ -1,4 +1,5 @@
 #! /usr/bin/python 
+# -*- coding: UTF-8 -*-
 # A set of python utility functions using pyxlib to get information about
 # windows and desktop
 import sys
@@ -17,6 +18,45 @@ def get_property(window, prop_name, type):
 def get_window(display, wid):
   cls = display.get_resource_class('window', xobject.drawable.Window)
   return cls(display, wid, owner = 1)
+
+from Xlib import xobject
+def get_parent_absolute_position(win):
+    x,y=0,0
+    while True:
+        try:
+            pwin=win.query_tree().parent
+            g=pwin.get_geometry()
+            x+=g.x
+            y+=g.y
+        except:
+            break
+        win=pwin
+    return x,y
+
+def moveandresize(wid,x,y,w,h):
+  disp = display.Display()
+  root_win = disp.screen().root
+  disp,wid=root_win.display,wid
+  win=xobject.drawable.Window(disp,wid)
+  win.configure(x=x,y=y,width=w,height=h)
+  win.get_geometry()
+def flush(wid):
+  disp = display.Display()
+  root_win = disp.screen().root
+  disp,wid=root_win.display,wid
+  win=xobject.drawable.Window(disp,wid)
+  win.get_geometry()
+def get_active_window():
+  disp = display.Display()
+  root_win = disp.screen().root
+  win = get_property(root_win, "_NET_ACTIVE_WINDOW", Xatom.WINDOW)
+  disp,wid=root_win.display,win.value[0]
+  window = get_window(disp, wid)
+  win=xobject.drawable.Window(disp,wid)
+  win.configure(width=800)
+  win.get_geometry()
+  return window
+  return new_window_from_wid(root_win.display, win.value[0])
 
 # Information (name, geometry) about a window
 class WindowInfo:
@@ -67,11 +107,11 @@ def get_windows():
 
   return win_infos
 
-def get_active_window():
+def get_root_win():
   disp = display.Display()
   root_win = disp.screen().root
-  win = get_property(root_win, "_NET_ACTIVE_WINDOW", Xatom.WINDOW)
-  return new_window_from_wid(root_win.display, win.value)
+  return root_win
+
 
 def get_current_desktop():
   disp = display.Display()
@@ -112,3 +152,21 @@ if __name__ == '__main__':
 
   print "current_desktop : %i"%get_current_desktop()
 
+
+disp = display.Display()
+root_win = disp.screen().root
+
+def get_active_window():
+  win = get_property(root_win, "_NET_ACTIVE_WINDOW", Xatom.WINDOW)
+  return win.value[0]
+
+def get_position_and_size(winid):
+  window = get_window(root_win.display, winid)
+  px,py=get_parent_absolute_position(window)
+  g=window.get_geometry()
+  return [g.x+px,g.y+py,g.width,g.height]
+def get_shift():
+    win=get_active_window()
+    pos1=xutils.get_position_and_size(win)
+    xutils.moveandresize(win,*pos1)
+    pos2=xutils.get_position_and_size(win)

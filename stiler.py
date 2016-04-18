@@ -39,16 +39,20 @@ import subprocess
 import time
 from config import *
 import config
+import xutils
 
 
-def _exec_and_output(cmd):
-    ENCODING = 'utf8'
-    return subprocess.check_output(cmd, shell=True).decode(ENCODING)
+from util import _exec_and_output
+from util import _exec
+def get_active_window():
+    active = int(_exec_and_output("xdotool getactivewindow").split()[0])
+    if active not in WinList[Desktop]:
+        active = None
+    return active
+#from util import _exec_and_output
+from xutils import get_active_window
+#from xdotool import get_active_window
 
-
-def _exec(cmd):
-    # print(cmd)
-    os.system(cmd)
 
 
 def retrieve(file=config.TempFile):
@@ -114,11 +118,6 @@ def initialize2(desk_list):
     return win_list, win_list_all,  win_filtered_all
 
 
-def get_active_window():
-    active = int(_exec_and_output("xdotool getactivewindow").split()[0])
-    if active not in WinList[Desktop]:
-        active = None
-    return active
 
 Desktop, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr, desk_list = initialize1()
 WinList, WinListAll,  WinPosInfoAll = initialize2(desk_list)
@@ -341,6 +340,8 @@ def move_window(windowid, x, y, w, h):
     _name = WinPosInfo[windowid][0]
     if _name in config.NOTITLE:
         h += WinTitle
+    xutils.moveandresize(windowid,x,y,w,h)
+def move_wmctrl(windowid,x,y,w,h):
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
     #command='xdotool windowmove  %d %d %d' %(windowid,x,y)
@@ -465,9 +466,11 @@ def moveandresize(target):
     # cannot find target window
     if None == active:
         return False
-    lay = get_current_tile([active], WinPosInfo)[0]
+#    lay = get_current_tile([active], WinPosInfo)[0]
+    lay=xutils.get_position_and_size(active)
     for i in range(4):
         lay[i]+=target[i]
+    lay[1]-=24
     move_window(active,*lay)
     return True
 
