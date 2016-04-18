@@ -27,6 +27,7 @@ Usage:
   stiler.py (grow|shrink) (height|width)
   stiler.py cycle 
   stiler.py anticycle 
+  stiler.py (save|load) <layout_id>
   stiler.py -h | --help
 
 Options:
