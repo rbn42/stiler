@@ -343,8 +343,10 @@ def move_window(windowid, x, y, w, h):
     unmaximize_one(windowid)
     # Now move it
     _name = WinPosInfo[windowid][0]
-    if _name in config.NOTITLE:
+    if check_notitle1(_name): 
         h += WinTitle
+    if check_notitle2(_name): 
+        y += WinTitle
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
     #command='xdotool windowmove  %d %d %d' %(windowid,x,y)
@@ -382,7 +384,7 @@ def get_current_tile(wins, posinfo):
     for _id in wins:
         _name, _pos = posinfo[_id]
         x, y, w, h = _pos
-        if _name in config.NOTITLE:
+        if check_notitle1(_name): 
             h -= WinTitle
             y += WinTitle
         l.append([x, y, w, h])
@@ -405,7 +407,19 @@ def cycle(reverse=False):
     PERSISTENT_DATA['winlist'] = WinList
     store()
 
+def check_notitle1(name):
+    for n in config.NOTITLE1:
+        if n in name:
+            print(name)
+            return True
+    return False
 
+def check_notitle2(name):
+    for n in config.NOTITLE2:
+        if n in name:
+            print(name)
+            return True
+    return False
 def getkdtree(winlist, lay):
     # begin "normalize positions"
     '''
