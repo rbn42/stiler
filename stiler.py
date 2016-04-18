@@ -679,20 +679,30 @@ def move_kdtree(target,allow_create_new_node=True):
 
 
 def swap(target):
-    winlist = create_win_list(WinList)
-    lay = get_current_tile(winlist, WinPosInfo)
 
+    winlist = WinList[Desktop]
     active = get_active_window()
+
     if None == active:
         return False
 
-    target = find(active, target, winlist, WinPosInfo)
-    if None == target:
+
+    target_window_id=find_kdtree(active,target,allow_parent=False)
+
+    if None==target_window_id:
+        target_window_id= find(active, target, winlist, WinPosInfo)
+
+    if None==target_window_id:
+        target_window_id=find_kdtree(active,target,allow_parent=True)
+
+    if None == target_window_id:
         return False
 
-    i0 = winlist.index(active)
-    i1 = winlist.index(target)
 
+    i0 = winlist.index(active)
+    i1 = winlist.index(target_window_id)
+
+    lay = get_current_tile(winlist, WinPosInfo)
     arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
 
     winlist[i0], winlist[i1] = winlist[i1], winlist[i0]
@@ -745,28 +755,36 @@ def find(center, target, winlist, posinfo):
 
 
 def focus(target):
-    if NavigateAcrossWorkspaces:
-        Windows = WinListAll[Desktop]
-    else:
-        Windows = WinList[Desktop]
 
     active = get_active_window()
-    target = find(active, target, Windows, WinPosInfo)
-    if None == target:
+
+    target_window_id=find_kdtree(active,target,allow_parent=False)
+
+    if None==target_window_id:
+        if config.NavigateAcrossWorkspaces:
+            Windows = WinListAll[Desktop]
+        else:
+            Windows = WinList[Desktop]
+        target_window_id= find(active, target, Windows, WinPosInfo)
+
+    if None==target_window_id:
+        target_window_id=find_kdtree(active,target,allow_parent=True)
+
+    if None == target_window_id:
         return False
-    i1 = Windows.index(target)
-    raise_window(Windows[i1])
+
+    raise_window(target_window_id)
     return True
 
 
-def focus_kdtree(target,allow_parent=True):
+def find_kdtree(center,target,allow_parent=True):
     '''
     Adjust non-overlapping layout.
     '''
+    active=center
 
-    active = get_active_window()
     if None == active:
-        return False
+        return None
 
     winlist = WinList[Desktop]
     lay = get_current_tile(winlist, WinPosInfo)
@@ -779,7 +797,7 @@ def focus_kdtree(target,allow_parent=True):
         promote = target in ['down', 'up']
 
     if promote and not allow_parent:
-        return False
+        return None
 
     shift = -1 if target in ['left', 'up'] else 1
 
@@ -793,16 +811,15 @@ def focus_kdtree(target,allow_parent=True):
             target = c.parent.children[i + shift]
             break
         if None == c.parent.parent or None == c.parent.parent.parent:
-            return False
+            return None
         if not allow_parent:
-            return False
+            return None
         c = c.parent.parent
 
     if None == target or target.overlap:
-        return False
+        return None
     else:
-        raise_window(target.key)
-        return True
+        return target.key
 
 
 def minimize(wincount):
@@ -860,9 +877,7 @@ if __name__ == '__main__':
     elif arguments['move']:
         move(target)
     elif arguments['focus']:
-        if not focus_kdtree(target,allow_parent=False):
-            if not focus(target):
-                focus_kdtree(target,allow_parent=True)
+        focus(target)
 
     elif arguments['layout']:
         assert not arguments['next'] == arguments['prev']
