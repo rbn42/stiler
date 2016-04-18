@@ -202,7 +202,16 @@ def change_tile(reverse=False):
     else:
         shift = 1
 
+
     t = PERSISTENT_DATA.get('tile', None)
+
+    OVERLAP_LAYOUT=['minimize','maximize']
+    if not None==t and t not in OVERLAP_LAYOUT:
+        current_layout= get_current_tile(winlist, WinPosInfo)
+        if getkdtree(winlist,current_layout)[0].overlap:
+            shift=0
+
+
     if 0 == shift and t in tiles_map:
         pass
     elif t in TILES:
@@ -410,14 +419,12 @@ def cycle(reverse=False):
 def check_notitle1(name):
     for n in config.NOTITLE1:
         if n in name:
-            print(name)
             return True
     return False
 
 def check_notitle2(name):
     for n in config.NOTITLE2:
         if n in name:
-            print(name)
             return True
     return False
 def getkdtree(winlist, lay):
@@ -565,7 +572,9 @@ def resize_kdtree(resize_width, resize_height):
 
     # load k-d tree
     from kdtree import getLayoutAndKey
-    a, b = (getLayoutAndKey(_tree))
+    a, b ,reach_size_limit= (getLayoutAndKey(_tree))
+    if reach_size_limit:
+        return False
     arrange(a, b)
     return True
 
