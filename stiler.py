@@ -340,7 +340,8 @@ def move_window(windowid, x, y, w, h):
     _name = WinPosInfo[windowid][0]
     if _name in config.NOTITLE:
         h += WinTitle
-    xutils.moveandresize(windowid,x,y,w,h)
+    w=xutils.moveandresize(windowid,x,y,w,h)
+    return w
 def move_wmctrl(windowid,x,y,w,h):
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
@@ -370,8 +371,13 @@ def create_win_list(winlist):
 
 
 def arrange(layout, windows):
+    l=[]
     for win, lay in zip(windows, layout):
-        move_window(win, *lay)
+        w=move_window(win, *lay)
+        l.append(w)
+    for w in l:
+        w.get_geometry()
+            
 
 
 def get_current_tile(wins, posinfo):
@@ -469,9 +475,9 @@ def moveandresize(target):
 #    lay = get_current_tile([active], WinPosInfo)[0]
     lay=xutils.get_position_and_size(active)
     for i in range(4):
-        lay[i]+=target[i]
-    lay[1]-=24
-    move_window(active,*lay)
+        lay[i]+=target[i] 
+    arrange([lay],[active])
+
     return True
 
 def resize_kdtree(resize_width, resize_height):

@@ -4,6 +4,7 @@
 # windows and desktop
 import sys
 import os
+import config
 
 from Xlib import X, display, Xutil, Xatom, xobject
 
@@ -39,7 +40,9 @@ def moveandresize(wid,x,y,w,h):
   disp,wid=root_win.display,wid
   win=xobject.drawable.Window(disp,wid)
   win.configure(x=x,y=y,width=w,height=h)
-  win.get_geometry()
+  return win
+  delay=lambda:win.get_geometry()
+  return delay
 def flush(wid):
   disp = display.Display()
   root_win = disp.screen().root
@@ -160,13 +163,24 @@ def get_active_window():
   win = get_property(root_win, "_NET_ACTIVE_WINDOW", Xatom.WINDOW)
   return win.value[0]
 
-def get_position_and_size(winid):
+def get_position_and_size(winid,shift=True):
   window = get_window(root_win.display, winid)
   px,py=get_parent_absolute_position(window)
   g=window.get_geometry()
-  return [g.x+px,g.y+py,g.width,g.height]
+  pos=[g.x+px,g.y+py,g.width,g.height]
+  if shift: 
+      return [i0+i1 for i0,i1 in zip(pos,config.XUTIL_SHIFT)]
+  else:
+      return pos
+
 def get_shift():
     win=get_active_window()
-    pos1=xutils.get_position_and_size(win)
-    xutils.moveandresize(win,*pos1)
-    pos2=xutils.get_position_and_size(win)
+    pos1=get_position_and_size(win,shift=False)
+    w=moveandresize(win,*pos1)
+    w.get_geometry()
+    pos2=get_position_and_size(win,shift=False)
+    shift =[ i0-i1 for i0,i1 in zip(pos1,pos2)]
+    pos3=[i0+i1 for i0,i1 in zip(shift,pos1)]
+    w=moveandresize(win,*pos3)
+    w.get_geometry()
+    return shift

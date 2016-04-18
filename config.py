@@ -11,3 +11,4 @@ NOTITLE=['tilda']
 EXCLUDE_APPLICATIONS=['<unknown>', 'x-nautilus-desktop','unity-launcher', 'unity-panel'] + ['Hud','unity-dash', 'Desktop','screenkey','XdndCollectionWindowImp']
 RESIZE_STEP=20
 MOVE_STEP=20
+XUTIL_SHIFT=[0,-28,0,0]
