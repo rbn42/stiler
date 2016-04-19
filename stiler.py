@@ -67,8 +67,8 @@ def initialize1():
 
 
 def initialize2(desktop):
-    s = _exec_and_output(
-        "xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' ")
+    cmd = "xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' "
+    s = _exec_and_output(cmd)
     x, y = s.split('x')
     resx, resy = int(x), int(y)
 
@@ -89,9 +89,7 @@ def initialize2(desktop):
         if name in config.EXCLUDE_APPLICATIONS:
             continue
 
-        winid = int(winid, 16)
-        x, y = int(x), int(y)
-        w, h = int(w), int(h)
+        winid, x, y, w, h = int(winid, 16), int(x), int(y), int(w), int(h)
 
         win_list_all.append(winid)
         WinPosInfoAll[winid] = name, [x, y - 72 + 44, w, h]
@@ -121,10 +119,6 @@ def get_last_active_window():
         if active in WinList:
             return active
 
-if os.path.exists(config.TempFile):
-    PERSISTENT_DATA_ALL = eval(open(config.TempFile).read())
-else:
-    PERSISTENT_DATA_ALL = {}
 
 desktop, desktop_x, desktop_y, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr = initialize1()
 WinList, WinListAll, WinPosInfo = initialize2(desktop)
@@ -135,6 +129,10 @@ MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
 OrigX = int(OrigXstr) + LeftPadding
 OrigY = int(OrigYstr) + TopPadding
 
+if os.path.exists(config.TempFile):
+    PERSISTENT_DATA_ALL = eval(open(config.TempFile).read())
+else:
+    PERSISTENT_DATA_ALL = {}
 PERSISTENT_DATA = PERSISTENT_DATA_ALL.get(Desktop, {})
 OldWinList = PERSISTENT_DATA.get('winlist', [])
 
