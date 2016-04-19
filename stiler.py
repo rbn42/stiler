@@ -78,23 +78,24 @@ def initialize2(desktop):
     win_list_all = []
     win_filtered_all = []
     for win in win_output:
-        winid, _desktop, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[0]
+        winid, _desktop, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[
+            0]
         if not _desktop == desktop:
             continue
         if host == 'N/A':
             continue
         if name in config.EXCLUDE_APPLICATIONS:
             continue
-        win_list_all.append(int(winid,16))
+        win_list_all.append(int(winid, 16))
         win_filtered_all.append(win)
 
         x, y = int(x), int(y)
         if x < 0 or x >= resx or y < 0 or y >= resy:
             continue
-        win_list.append(int(winid,16))
+        win_list.append(int(winid, 16))
         # TODO use xwininfo to exclude minimized windows
 
-    WinPosInfoAll=win_filtered_all
+    WinPosInfoAll = win_filtered_all
     WinPosInfoAll = [re.findall(r_wmctrl_lG, w)[0] for w in WinPosInfoAll]
     WinPosInfoAll = {int(_id, 16): (_name, [int(x), int(y), int(
         w), int(h)]) for _id, _ws, x, y, w, h, _host, _name in WinPosInfoAll}
@@ -126,7 +127,7 @@ else:
     PERSISTENT_DATA_ALL = {}
 
 desktop, desktop_x, desktop_y, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr = initialize1()
-WinList, WinListAll, WinPosInfo  = initialize2(desktop)
+WinList, WinListAll, WinPosInfo = initialize2(desktop)
 Desktop = '%s,%s,%s' % (desktop, desktop_x, desktop_y)
 
 MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
@@ -590,7 +591,7 @@ def move_kdtree(target, allow_create_new_node=True):
     if None == active:
         return False
 
-    winlist =WinList # create_win_list(WinList)
+    winlist = WinList  # create_win_list(WinList)
     # ignore layouts with less than 2 windows
     if len(winlist) < 2:
         return False
