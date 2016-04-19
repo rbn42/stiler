@@ -903,41 +903,41 @@ PERSISTENT_DATA = PERSISTENT_DATA_ALL.get(Desktop, {})
 OldWinList = PERSISTENT_DATA.get('winlist', [])
 
 if __name__ == '__main__':
-    lock(LockFile)
-    from docopt import docopt
-    arguments = docopt(__doc__)
+    if lock(LockFile):
+        from docopt import docopt
+        arguments = docopt(__doc__)
 
-    for target in ('up', 'down', 'left', 'right'):
-        if arguments[target]:
-            break
+        for target in ('up', 'down', 'left', 'right'):
+            if arguments[target]:
+                break
 
-    if False:
-        pass
-    elif arguments['cycle']:
-        cycle()
-    elif arguments['anticycle']:
-        cycle(reverse=True)
-    elif arguments['swap']:
-        swap(target)
-    elif arguments['move']:
-        move(target)
-    elif arguments['focus']:
-        focus(target)
+        if False:
+            pass
+        elif arguments['cycle']:
+            cycle()
+        elif arguments['anticycle']:
+            cycle(reverse=True)
+        elif arguments['swap']:
+            swap(target)
+        elif arguments['move']:
+            move(target)
+        elif arguments['focus']:
+            focus(target)
 
-    elif arguments['layout']:
-        assert not arguments['next'] == arguments['prev']
-        change_tile_or_insert_new_window(shift=-1 if arguments['prev'] else 1)
-    elif arguments['grow']:
-        if arguments['width']:
-            resize(config.RESIZE_STEP, 0)
-        else:
-            resize(0, config.RESIZE_STEP)
-    elif arguments['shrink']:
-        if arguments['width']:
-            resize(-config.RESIZE_STEP, 0)
-        else:
-            resize(0, -config.RESIZE_STEP)
+        elif arguments['layout']:
+            assert not arguments['next'] == arguments['prev']
+            change_tile_or_insert_new_window(shift=-1 if arguments['prev'] else 1)
+        elif arguments['grow']:
+            if arguments['width']:
+                resize(config.RESIZE_STEP, 0)
+            else:
+                resize(0, config.RESIZE_STEP)
+        elif arguments['shrink']:
+            if arguments['width']:
+                resize(-config.RESIZE_STEP, 0)
+            else:
+                resize(0, -config.RESIZE_STEP)
 
-    store()
+        store()
 
-    unlock(LockFile)
+        unlock(LockFile)
