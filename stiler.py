@@ -76,31 +76,31 @@ def initialize2(desktop):
 
     win_list = []
     win_list_all = []
-    win_filtered_all = []
+    WinPosInfoAll = {}
     for win in win_output:
+
         winid, _desktop, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[
             0]
+
         if not _desktop == desktop:
             continue
         if host == 'N/A':
             continue
         if name in config.EXCLUDE_APPLICATIONS:
             continue
-        win_list_all.append(int(winid, 16))
-        win_filtered_all.append(win)
 
+        winid = int(winid, 16)
         x, y = int(x), int(y)
+        w, h = int(w), int(h)
+
+        win_list_all.append(winid)
+        WinPosInfoAll[winid] = name, [x, y - 72 + 44, w, h]
+
         if x < 0 or x >= resx or y < 0 or y >= resy:
             continue
-        win_list.append(int(winid, 16))
-        # TODO use xwininfo to exclude minimized windows
 
-    WinPosInfoAll = win_filtered_all
-    WinPosInfoAll = [re.findall(r_wmctrl_lG, w)[0] for w in WinPosInfoAll]
-    WinPosInfoAll = {int(_id, 16): (_name, [int(x), int(y), int(
-        w), int(h)]) for _id, _ws, x, y, w, h, _host, _name in WinPosInfoAll}
-    for _id in WinPosInfoAll:
-        WinPosInfoAll[_id][1][1] += -72 + 44
+        win_list.append(winid)
+        # TODO use xwininfo to exclude minimized windows
 
     return win_list, win_list_all,  WinPosInfoAll
 
