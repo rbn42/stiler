@@ -52,17 +52,6 @@ def _exec(cmd):
     os.system(cmd)
 
 
-def retrieve(file=config.TempFile):
-    if os.path.exists(file):
-        return eval(open(file).read())
-    else:
-        return {}
-PERSISTENT_DATA = retrieve()
-
-
-def store(object=PERSISTENT_DATA, file=config.TempFile):
-    with open(file, 'w') as f:
-        f.write(str(object))
 
 r_wmctrl_lG = '^([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(.+)$'
 r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
@@ -70,17 +59,15 @@ r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
 
 def initialize1():
     desk_output = _exec_and_output("wmctrl -d").strip().split("\n")
-    desk_list = [line.split()[0] for line in desk_output]
 
     current = [x for x in desk_output if x.split()[1] == "*"][0]
     current = re.findall(r_wmctrl_d, current.strip())[0]
-    desktop = current[0]
-    orig_x, orig_y, width, height = current[-4:]
+    desktop,_,_,desktop_x,desktop_y,orig_x, orig_y, width, height = current
 
-    return desktop, orig_x, orig_y, width, height, desk_list
+    return desktop,desktop_x,desktop_y, orig_x, orig_y, width, height
 
 
-def initialize2(desk_list):
+def initialize2(desktop):
     s = _exec_and_output(
         "xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' ")
     x, y = s.split('x')
@@ -106,29 +93,44 @@ def initialize2(desk_list):
 
     win_list = {}
     win_list_all = {}
-    for desk in desk_list:
-        win_list[desk] = [int(x.split()[0], 16)
-                          for x in win_filtered if x.split()[1] == desk]
-        win_list_all[desk] = [int(x.split()[0], 16)
-                              for x in win_filtered_all if x.split()[1] == desk]
+    win_list = [int(x.split()[0], 16)
+                      for x in win_filtered if x.split()[1] == desktop]
+    win_list_all = [int(x.split()[0], 16)
+                          for x in win_filtered_all if x.split()[1] == desktop]
 
     return win_list, win_list_all,  win_filtered_all
 
 
 def get_active_window():
     active = int(_exec_and_output("xdotool getactivewindow").split()[0])
-    if active not in WinList[Desktop]:
+    if active not in WinList:
         active = None
+    if not None==active:
+        h=PERSISTENT_DATA.get('active_history',[])
+        h.insert(0,active)
+        PERSISTENT_DATA['active_history']=h[:1000]
     return active
 
-Desktop, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr, desk_list = initialize1()
-WinList, WinListAll,  WinPosInfoAll = initialize2(desk_list)
+def get_last_active_window():
+    for active in PERSISTENT_DATA.get('active_history',[]):
+        if active in WinList:
+            return active
+
+if os.path.exists(config.TempFile):
+    PERSISTENT_DATA_ALL=eval(open(config.TempFile).read())
+else:
+    PERSISTENT_DATA_ALL={}
+
+desktop,desktop_x,desktop_y, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr = initialize1()
+WinList, WinListAll,  WinPosInfoAll = initialize2(desktop)
+Desktop='%s,%s,%s'%(desktop,desktop_x,desktop_y)
+PERSISTENT_DATA=PERSISTENT_DATA_ALL.get(Desktop,{})
 
 MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
 MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
 OrigX = int(OrigXstr) + LeftPadding
 OrigY = int(OrigYstr) + TopPadding
-OldWinList = PERSISTENT_DATA.get('winlist', {})
+OldWinList = PERSISTENT_DATA.get('winlist', [])
 
 
 WinPosInfoAll = [re.findall(r_wmctrl_lG, w)[0] for w in WinPosInfoAll]
@@ -194,9 +196,7 @@ def change_tile(reverse=False):
     TILES.append('maximize')
 
     # TODO unable to compare windows's numbers between different workspaces
-    if None == OldWinList.get(Desktop, None):
-        shift = 0
-    elif not len(winlist) == len(OldWinList[Desktop]):
+    if not len(winlist) == len(OldWinList):
         shift = 0
     elif reverse:
         shift = - 1
@@ -226,11 +226,9 @@ def change_tile(reverse=False):
     if not None == tile:
         arrange(tile, winlist)
 
-    WinList[Desktop] = winlist
     PERSISTENT_DATA['overall_position'] = None
     PERSISTENT_DATA['tile'] = t
-    PERSISTENT_DATA['winlist'] = WinList
-    store()
+    PERSISTENT_DATA['winlist'] = winlist
 
 
 def get_vertical_tile(wincount):
@@ -378,8 +376,8 @@ def raise_window(windowid):
 
 
 def create_win_list(winlist):
-    new = winlist[Desktop]
-    old = OldWinList.get(Desktop, [])
+    new = winlist
+    old = OldWinList
     Windows = [w for w in old if w in new] + [w for w in new if w not in old]
     return Windows
 
@@ -413,9 +411,7 @@ def cycle(reverse=False):
     i1 = (i0 + shift) % len(winlist)
     raise_window(winlist[i1])
 
-    WinList[Desktop] = winlist
-    PERSISTENT_DATA['winlist'] = WinList
-    store()
+    PERSISTENT_DATA['winlist'] = winlist
 
 def check_notitle1(name):
     for n in config.NOTITLE1:
@@ -460,10 +456,8 @@ def getkdtree(winlist, lay):
               min(y1, int(MaxHeightStr))]
     if None == p2:
         PERSISTENT_DATA['overall_position'] = [i for i in p1]
-        store()
     elif p1[0] < p2[0] or p1[1] < p2[1] or p1[2] > p2[2] or p1[3] > p2[3]:
         PERSISTENT_DATA['overall_position'] = [i for i in p1]
-        store()
     else:
         # Root nodes
         pass
@@ -707,9 +701,7 @@ def swap(target):
     arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
 
     winlist[i0], winlist[i1] = winlist[i1], winlist[i0]
-    WinList[Desktop] = winlist
-    PERSISTENT_DATA['winlist'] = WinList
-    store()
+    PERSISTENT_DATA['winlist'] = winlist
     return True
 
 
@@ -763,9 +755,9 @@ def focus(target):
 
     if None==target_window_id:
         if config.NavigateAcrossWorkspaces:
-            Windows = WinListAll[Desktop]
+            Windows = WinListAll
         else:
-            Windows = WinList[Desktop]
+            Windows = WinList
         target_window_id= find(active, target, Windows, WinPosInfo)
 
     if None==target_window_id:
@@ -787,7 +779,7 @@ def find_kdtree(center,target,allow_parent=True):
     if None == active:
         return None
 
-    winlist = WinList[Desktop]
+    winlist = WinList
     lay = get_current_tile(winlist, WinPosInfo)
     _tree, _map = getkdtree(winlist, lay)
     current_node = _map[active]
@@ -893,4 +885,9 @@ if __name__ == '__main__':
             resize(-config.RESIZE_STEP, 0)
         else:
             resize(0, -config.RESIZE_STEP)
+
+    with open(config.TempFile, 'w') as f:
+        PERSISTENT_DATA_ALL[Desktop]=PERSISTENT_DATA
+        f.write(str(PERSISTENT_DATA_ALL))
+
     unlock(LockFile)
