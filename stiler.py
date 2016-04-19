@@ -708,13 +708,13 @@ def swap(target):
     if None == active:
         return False
 
-    target_window_id = find_kdtree(active, target, allow_parent=False)
+    target_window_id = find_kdtree(active, target, allow_parent_sibling=False)
 
     if None == target_window_id:
         target_window_id = find(active, target, winlist, WinPosInfo)
 
     if None == target_window_id:
-        target_window_id = find_kdtree(active, target, allow_parent=True)
+        target_window_id = find_kdtree(active, target, allow_parent_sibling=True)
 
     if None == target_window_id:
         return False
@@ -776,7 +776,7 @@ def focus(target):
 
     active = get_active_window()
 
-    target_window_id = find_kdtree(active, target, allow_parent=False)
+    target_window_id = find_kdtree(active, target, allow_parent_sibling=False)
 
     if None == target_window_id:
         if config.NavigateAcrossWorkspaces:
@@ -786,7 +786,7 @@ def focus(target):
         target_window_id = find(active, target, Windows, WinPosInfo)
 
     if None == target_window_id:
-        target_window_id = find_kdtree(active, target, allow_parent=True)
+        target_window_id = find_kdtree(active, target, allow_parent_sibling=True)
 
     if None == target_window_id:
         return False
@@ -795,7 +795,7 @@ def focus(target):
     return True
 
 
-def find_kdtree(center, target, allow_parent=True):
+def find_kdtree(center, target, allow_parent_sibling=True):
     '''
     Adjust non-overlapping layout.
     '''
@@ -814,14 +814,15 @@ def find_kdtree(center, target, allow_parent=True):
     else:
         promote = target in ['down', 'up']
 
-    if promote and not allow_parent:
-        return None
 
     shift = -1 if target in ['left', 'up'] else 1
 
+    promoted=False
+    
     c = current_node
     if promote:
         c = c.parent
+        promoted=True
 
     while True:
         i = c.parent.children.index(c)
@@ -830,10 +831,13 @@ def find_kdtree(center, target, allow_parent=True):
             break
         if None == c.parent.parent or None == c.parent.parent.parent:
             return None
-        if not allow_parent:
-            return None
         c = c.parent.parent
+        promoted=True
 
+    if promoted:
+        if not allow_parent_sibling:
+            if not target.leaf:
+                return None
     if None == target or target.overlap:
         return None
     else:
