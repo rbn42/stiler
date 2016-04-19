@@ -93,7 +93,13 @@ def create_parent(node):
     index = parent.parent.children.index(node)
     parent.parent.children[index] = parent
     return parent
-
+def create_sibling(node):
+    sibling=Node()
+    sibling.parent=node.parent
+    sibling.position=[i for i in node.position]
+    i=node.parent.children.index(node)
+    node.parent.children.insert(i+1,sibling)
+    return sibling
 
 class Node:
     parent = None
