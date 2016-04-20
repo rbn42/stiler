@@ -5,7 +5,7 @@ This is a window tiling and navigation tool based on wmctrl and xdotool. I tried
 Dependency
 =
 ```bash
-sudo apt install python-docopt -y
+sudo apt install xdotool wmctrl python-docopt -y
 ```
 
 Usage
