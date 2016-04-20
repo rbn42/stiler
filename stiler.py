@@ -140,11 +140,9 @@ def change_tile_or_insert_new_window(shift):
     if len(WinList) < 1:
         return
 
-    print(WinList,OldWinList)
     if len(WinList) ==1+ len(OldWinList): 
         if insert_focused_window_into_kdtree():
             return
-    print('layout')
     if len(WinList) == len(OldWinList):
         change_tile(shift)
     else:
@@ -155,11 +153,9 @@ def change_tile_or_insert_new_window(shift):
 
 def insert_focused_window_into_kdtree():
     active=get_active_window()
-    print(active)
     if None==active:
         return False
     last_active=get_last_active_window()
-    print(last_active)
     if None==last_active:
         return False
     if insert_window_into_kdtree(active,last_active):
@@ -224,6 +220,9 @@ def change_tile(shift):
         TILES.append('col1')
     TILES.append('maximize')
 
+    if MaxWidth < MaxHeight:
+        TILES=['col1']
+
     # TODO unable to compare windows's numbers between different workspaces
 
     t = PERSISTENT_DATA.get('tile', None)
@@ -237,9 +236,7 @@ def change_tile(shift):
     else:
         t = TILES[0]
 
-    print(t)
     tile = tiles_map[t](len(winlist))
-    print(tile)
     if not None == tile:
         arrange(tile, winlist)
 
@@ -598,9 +595,7 @@ def insert_window_into_kdtree(winid,target):
     lay = get_current_tile(winlist, WinPosInfo)
     _tree, _map = getkdtree(winlist, lay)
     target_node = _map[target]
-    print(1)
     if target_node.parent.overlap:
-        print('fail')
         return False
     from kdtree import create_sibling
     node=create_sibling(target_node)
