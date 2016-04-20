@@ -27,6 +27,7 @@ Usage:
   stiler.py (grow|shrink) (height|width)
   stiler.py cycle 
   stiler.py anticycle 
+  stiler.py (save|load) <layout_id>
   stiler.py -h | --help
 
 Options:
@@ -55,87 +56,66 @@ from xutils import get_active_window
 
 
 
-def retrieve(file=config.TempFile):
-    if os.path.exists(file):
-        return eval(open(file).read())
-    else:
-        return {}
-PERSISTENT_DATA = retrieve()
-
-
-def store(object=PERSISTENT_DATA, file=config.TempFile):
-    with open(file, 'w') as f:
-        f.write(str(object))
-
 r_wmctrl_lG = '^([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(.+)$'
 r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
 
 
 def initialize1():
     desk_output = _exec_and_output("wmctrl -d").strip().split("\n")
-    desk_list = [line.split()[0] for line in desk_output]
 
     current = [x for x in desk_output if x.split()[1] == "*"][0]
     current = re.findall(r_wmctrl_d, current.strip())[0]
-    desktop = current[0]
-    orig_x, orig_y, width, height = current[-4:]
+    desktop, _, _, desktop_x, desktop_y, orig_x, orig_y, width, height = current
 
-    return desktop, orig_x, orig_y, width, height, desk_list
+    return desktop, desktop_x, desktop_y, orig_x, orig_y, width, height
 
 
-def initialize2(desk_list):
-    s = _exec_and_output(
-        "xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' ")
+def initialize2(desktop):
+    cmd = "xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' "
+    s = _exec_and_output(cmd)
     x, y = s.split('x')
     resx, resy = int(x), int(y)
 
     win_output = _exec_and_output("wmctrl -lG").strip().split("\n")
 
-    win_filtered = []
-    win_filtered_all = []
+    win_list = []
+    win_list_all = []
+    WinPosInfoAll = {}
     for win in win_output:
-        _, _, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[0]
+
+        winid, _desktop, x, y, w, h, host, name = re.findall(r_wmctrl_lG, win)[
+            0]
+
+        if not _desktop == desktop:
+            continue
         if host == 'N/A':
             continue
         if name in config.EXCLUDE_APPLICATIONS:
             continue
-        win_filtered_all.append(win)
 
-        x, y = int(x), int(y)
+        winid, x, y, w, h = int(winid, 16), int(x), int(y), int(w), int(h)
+
+        win_list_all.append(winid)
+        WinPosInfoAll[winid] = name, [x, y - 72 + 44, w, h]
+
         if x < 0 or x >= resx or y < 0 or y >= resy:
             continue
-        win_filtered.append(win)
+
+        win_list.append(winid)
         # TODO use xwininfo to exclude minimized windows
 
-    win_list = {}
-    win_list_all = {}
-    for desk in desk_list:
-        win_list[desk] = [int(x.split()[0], 16)
-                          for x in win_filtered if x.split()[1] == desk]
-        win_list_all[desk] = [int(x.split()[0], 16)
-                              for x in win_filtered_all if x.split()[1] == desk]
-
-    return win_list, win_list_all,  win_filtered_all
+    return win_list, win_list_all,  WinPosInfoAll
 
 
 
-Desktop, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr, desk_list = initialize1()
-WinList, WinListAll,  WinPosInfoAll = initialize2(desk_list)
 
-MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
-MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
-OrigX = int(OrigXstr) + LeftPadding
-OrigY = int(OrigYstr) + TopPadding
-OldWinList = PERSISTENT_DATA.get('winlist', {})
+def get_last_active_window():
+    for active in PERSISTENT_DATA.get('active_history', []):
+        if active in WinList:
+            if not active==get_active_window():
+                return active
+    return None
 
-
-WinPosInfoAll = [re.findall(r_wmctrl_lG, w)[0] for w in WinPosInfoAll]
-WinPosInfoAll = {int(_id, 16): (_name, [int(x), int(y), int(
-    w), int(h)]) for _id, _ws, x, y, w, h, _host, _name in WinPosInfoAll}
-for _id in WinPosInfoAll:
-    WinPosInfoAll[_id][1][1] += -72 + 44
-
-WinPosInfo = WinPosInfoAll
 
 
 def get_simple_tile(wincount):
@@ -143,25 +123,79 @@ def get_simple_tile(wincount):
     rows = wincount - 1
     layout = []
     if rows == 0:
-        layout.append(
-            (OrigX, OrigY, MaxWidth, MaxHeight - WinTitle - WinBorder))
+        layout.append(layout_shift(0, 0, MaxWidth, MaxHeight))
         return layout
     else:
-        layout.append((OrigX, OrigY, int(MaxWidth * MwFactor),
-                       MaxHeight - WinTitle - WinBorder))
+        layout.append(layout_shift(0, 0, int(MaxWidth * MwFactor),
+                                   MaxHeight))
 
-    x = OrigX + int((MaxWidth * MwFactor) + (2 * WinBorder))
-    width = int((MaxWidth * (1 - MwFactor)) - 2 * WinBorder)
-    height = int(MaxHeight / rows - WinTitle - WinBorder)
+    x = int((MaxWidth * MwFactor))
+    width = int((MaxWidth * (1 - MwFactor)))
+    height = int(MaxHeight / rows)
 
     for n in range(0, rows):
-        y = OrigY + int((MaxHeight / rows) * (n))
-        layout.append((x, y, width, height))
+        y = int((MaxHeight / rows) * (n))
+        layout.append(layout_shift(x, y, width, height))
 
     return layout
 
 
-def change_tile(reverse=False):
+def change_tile_or_insert_new_window(shift):
+    if len(WinList) < 1:
+        return
+
+    if len(WinList) ==1+ len(OldWinList): 
+        if insert_focused_window_into_kdtree():
+            return
+    if len(WinList) == len(OldWinList):
+        change_tile(shift)
+    else:
+        change_tile(0)
+
+
+
+
+def insert_focused_window_into_kdtree():
+    active=get_active_window()
+    if None==active:
+        return False
+    last_active=get_last_active_window()
+    if None==last_active:
+        return False
+    if insert_window_into_kdtree(active,last_active):
+        PERSISTENT_DATA['winlist'] = WinList
+        return True
+    return False
+
+
+def regularize_kd_tree(regularize_node,
+        min_width=config.MIN_WINDOW_WIDTH,
+        min_height=config.MIN_WINDOW_HEIGHT):
+    if None == regularize_node:
+        return False
+    # regularize k-d tree
+    from kdtree import regularize
+    regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
+
+    # load k-d tree
+    from kdtree import getLayoutAndKey
+    a, b, reach_size_limit = getLayoutAndKey(
+        regularize_node, min_width=min_width, min_height=min_height)
+    if reach_size_limit:
+        return False
+    arrange(a, b)
+    return True
+
+
+def detect_overlap():
+    t = PERSISTENT_DATA.get('tile', None)
+    OVERLAP_LAYOUT = ['minimize', 'maximize']
+    if not None == t and t not in OVERLAP_LAYOUT:
+        current_layout = get_current_tile(WinList, WinPosInfo)
+        return getkdtree(WinList, current_layout)[0].overlap
+
+
+def change_tile(shift):
     # TODO available tiling layouts
     tiles_map = {
         'col2_l': lambda w: get_columns_tile2(w, reverse=False, cols=2),
@@ -177,8 +211,6 @@ def change_tile(reverse=False):
     }
 
     winlist = create_win_list(WinList)
-    if len(winlist) < 1:
-        return
 
     if len(winlist) < 2:
         TILES = []
@@ -192,17 +224,16 @@ def change_tile(reverse=False):
         TILES.append('col1')
     TILES.append('maximize')
 
+    #for rotated screen
+    if MaxWidth < MaxHeight:
+        if len(winlist) > 1:
+            TILES=['col1']
+        TILES.append('maximize')
+
     # TODO unable to compare windows's numbers between different workspaces
-    if None == OldWinList.get(Desktop, None):
-        shift = 0
-    elif not len(winlist) == len(OldWinList[Desktop]):
-        shift = 0
-    elif reverse:
-        shift = - 1
-    else:
-        shift = 1
 
     t = PERSISTENT_DATA.get('tile', None)
+
     if 0 == shift and t in tiles_map:
         pass
     elif t in TILES:
@@ -216,11 +247,9 @@ def change_tile(reverse=False):
     if not None == tile:
         arrange(tile, winlist)
 
-    WinList[Desktop] = winlist
     PERSISTENT_DATA['overall_position'] = None
     PERSISTENT_DATA['tile'] = t
-    PERSISTENT_DATA['winlist'] = WinList
-    store()
+    PERSISTENT_DATA['winlist'] = winlist
 
 
 def get_vertical_tile(wincount):
@@ -260,8 +289,8 @@ def get_autogrid_tile(wincount):
         windowsleft -= cols
         colwidth = MaxWidth / cols
         for col in range(cols):
-            layout.append((OrigX + colwidth * col, OrigY + row *
-                           rowheight, colwidth, rowheight - WinTitle - WinBorder))
+            layout.append(layout_shift(colwidth * col, row *
+                                       rowheight, colwidth, rowheight))
     return layout[:wincount]
 # end https://bbs.archlinux.org/viewtopic.php?id=64100&p=6  #150
 
@@ -281,9 +310,16 @@ def get_columns_tile2(wincount, reverse=False, cols=2):
         windowsleft -= rows
         rowheight = MaxHeight / rows
         for row in range(rows):
-            layout.append((OrigX + colwidth * col + WinBorder, OrigY + row *
-                           rowheight, colwidth - 2 * WinBorder, rowheight - WinTitle - WinBorder))
+            layout.append(layout_shift(
+                colwidth * col,
+                row * rowheight,
+                colwidth,
+                rowheight))
     return layout[:wincount]
+
+
+def layout_shift(x, y, w, h):
+    return OrigX + x + WinBorder, OrigY + y + WinBorder, w - 2 * WinBorder, h - WinTitle - 2 * WinBorder
 # from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
 
 
@@ -338,8 +374,10 @@ def move_window(windowid, x, y, w, h):
     unmaximize_one(windowid)
     # Now move it
     _name = WinPosInfo[windowid][0]
-    if _name in config.NOTITLE:
+    if check_notitle1(_name):
         h += WinTitle
+    if check_notitle2(_name):
+        y += WinTitle
     w=xutils.moveandresize(windowid,x,y,w,h)
     return w
 def move_wmctrl(windowid,x,y,w,h):
@@ -364,8 +402,8 @@ def raise_window(windowid):
 
 
 def create_win_list(winlist):
-    new = winlist[Desktop]
-    old = OldWinList.get(Desktop, [])
+    new = winlist
+    old = OldWinList
     Windows = [w for w in old if w in new] + [w for w in new if w not in old]
     return Windows
 
@@ -385,7 +423,7 @@ def get_current_tile(wins, posinfo):
     for _id in wins:
         _name, _pos = posinfo[_id]
         x, y, w, h = _pos
-        if _name in config.NOTITLE:
+        if check_notitle1(_name):
             h -= WinTitle
             y += WinTitle
         l.append([x, y, w, h])
@@ -404,9 +442,21 @@ def cycle(reverse=False):
     i1 = (i0 + shift) % len(winlist)
     raise_window(winlist[i1])
 
-    WinList[Desktop] = winlist
-    PERSISTENT_DATA['winlist'] = WinList
-    store()
+    PERSISTENT_DATA['winlist'] = winlist
+
+
+def check_notitle1(name):
+    for n in config.NOTITLE1:
+        if n in name:
+            return True
+    return False
+
+
+def check_notitle2(name):
+    for n in config.NOTITLE2:
+        if n in name:
+            return True
+    return False
 
 
 def getkdtree(winlist, lay):
@@ -441,31 +491,35 @@ def getkdtree(winlist, lay):
               min(y1, int(MaxHeightStr))]
     if None == p2:
         PERSISTENT_DATA['overall_position'] = [i for i in p1]
-        store()
     elif p1[0] < p2[0] or p1[1] < p2[1] or p1[2] > p2[2] or p1[3] > p2[3]:
         PERSISTENT_DATA['overall_position'] = [i for i in p1]
-        store()
     else:
         # Root nodes
-        _tree.position = [i for i in p2]
-        _tree.children[0].position = [i for i in p2]
-        _tree.children[0].children[0].position = [i for i in p2]
+        pass
+        #_tree.position = [i for i in p2]
+        #_tree.children[0].position = [i for i in p2]
+        #_tree.children[0].children[0].position = [i for i in p2]
     # end "reload old root"
     return _tree, _map
 
+
 def resize(resize_width, resize_height):
-    if resize_kdtree(resize_width,resize_height):
+    if resize_kdtree(resize_width, resize_height):
         return True
-    return moveandresize([0,0,resize_width,resize_height])
+    return moveandresize([0, 0, resize_width, resize_height])
+
 
 def move(target):
-    if move_kdtree(target):
+    if move_kdtree(target, allow_create_new_node=True):
         return True
-    target={'left':[-config.MOVE_STEP,0,0,0],
-            'down':[0,config.MOVE_STEP,0,0],
-            'up':[0,-config.MOVE_STEP,0,0],
-            'right':[config.MOVE_STEP,0,0,0],}[target]
+    if move_kdtree(target, allow_create_new_node=False):
+        return True
+    target = {'left': [-config.MOVE_STEP, 0, 0, 0],
+              'down': [0, config.MOVE_STEP, 0, 0],
+              'up': [0, -config.MOVE_STEP, 0, 0],
+              'right': [config.MOVE_STEP, 0, 0, 0], }[target]
     return moveandresize(target)
+
 
 def moveandresize(target):
     active = get_active_window()
@@ -479,6 +533,7 @@ def moveandresize(target):
     arrange([lay],[active])
 
     return True
+
 
 def resize_kdtree(resize_width, resize_height):
     '''
@@ -518,13 +573,14 @@ def resize_kdtree(resize_width, resize_height):
     if not resize_current == 0:
         if not current_node.overlap:
             if not None == current_node.parent:
-                node=current_node
-                index=index_current
-                _resize=resize_current
+                node = current_node
+                index = index_current
+                _resize = resize_current
                 node.modified = True
                 regularize_node = node.parent
-                #invert the operation if the node is the last child of its parent
-                if regularize_node.children[-1]==node:
+                # invert the operation if the node is the last child of its
+                # parent
+                if regularize_node.children[-1] == node:
                     node.position[index] -= _resize
                 else:
                     node.position[index] += _resize
@@ -533,32 +589,38 @@ def resize_kdtree(resize_width, resize_height):
         if not None == current_node.parent:
             if not current_node.parent.overlap:
                 if not None == current_node.parent.parent:
-                    node=current_node.parent
-                    index=index_parent
-                    _resize=resize_parent
+                    node = current_node.parent
+                    index = index_parent
+                    _resize = resize_parent
                     node.modified = True
                     regularize_node = node.parent
-                    #invert the operation if the node is the last child of its parent
-                    if regularize_node.children[-1]==node:
+                    # invert the operation if the node is the last child of its
+                    # parent
+                    if regularize_node.children[-1] == node:
                         node.position[index] -= _resize
                     else:
                         node.position[index] += _resize
 
-    if None==regularize_node:
+    if None == regularize_node:
         return False
-    # regularize k-d tree
     regularize_node = regularize_node.parent
-    from kdtree import regularize
-    regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
 
-    # load k-d tree
-    from kdtree import getLayoutAndKey
-    a, b = (getLayoutAndKey(_tree))
-    arrange(a, b)
-    return True
+    return regularize_kd_tree(regularize_node)
 
+def insert_window_into_kdtree(winid,target):
+    winlist=[w for w in WinList if not w==winid]
+    lay = get_current_tile(winlist, WinPosInfo)
+    _tree, _map = getkdtree(winlist, lay)
+    target_node = _map[target]
+    if target_node.parent.overlap:
+        return False
+    from kdtree import create_sibling
+    node=create_sibling(target_node)
+    node.key=winid
+    node.leaf=True
+    return regularize_kd_tree(node.parent)
 
-def move_kdtree(target):
+def move_kdtree(target, allow_create_new_node=True):
     '''
     Adjust non-overlapping layout.
     '''
@@ -568,7 +630,7 @@ def move_kdtree(target):
     if None == active:
         return False
 
-    winlist = create_win_list(WinList)
+    winlist = WinList  # create_win_list(WinList)
     # ignore layouts with less than 2 windows
     if len(winlist) < 2:
         return False
@@ -610,19 +672,21 @@ def move_kdtree(target):
                     index_current - 1 + shift]
                 # If there is a leaf node at the target direction, build a new
                 # parent node for the leaf node and the current node.
-                if new_parent.leaf:
+                _swap = False or not allow_create_new_node
+                if new_parent.leaf and not _swap:
                     # But allow no more than one branch for each node
                     for sibling in new_parent.parent.children:
                         if not sibling.leaf:
                             # Just swap them.
-                            shift = -1 if target in ['left', 'up'] else 1
-                            regularize_node.children.insert(
-                                index_current + shift, current_node)
+                            _swap = True
                             break
                     else:
                         from kdtree import create_parent
                         new_parent = create_parent(new_parent)
-                        new_parent.children.append(current_node)
+                if _swap:
+                    shift = -1 if target in ['left', 'up'] else 1
+                    regularize_node.children.insert(
+                        index_current + shift, current_node)
                 else:
                     new_parent.children.append(current_node)
         else:
@@ -642,38 +706,39 @@ def move_kdtree(target):
 
     if regularize_node.overlap:
         return False
+
     # regularize k-d tree
     regularize_node = regularize_node.parent
-    from kdtree import regularize
-    regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
-    # load k-d tree
-    from kdtree import getLayoutAndKey
-    a, b = getLayoutAndKey(regularize_node, min_width=1, min_height=1)
-    arrange(a, b)
-    return True
+    return regularize_kd_tree(regularize_node,min_width=1,min_height=1)
 
 
 def swap(target):
-    winlist = create_win_list(WinList)
-    lay = get_current_tile(winlist, WinPosInfo)
 
+    winlist = create_win_list(WinList)
     active = get_active_window()
+
     if None == active:
         return False
 
-    target = find(active, target, winlist, WinPosInfo)
-    if None == target:
+    target_window_id = find_kdtree(active, target, allow_parent_sibling=False)
+
+    if None == target_window_id:
+        target_window_id = find(active, target, winlist, WinPosInfo)
+
+    if None == target_window_id:
+        target_window_id = find_kdtree(active, target, allow_parent_sibling=True)
+
+    if None == target_window_id:
         return False
 
     i0 = winlist.index(active)
-    i1 = winlist.index(target)
+    i1 = winlist.index(target_window_id)
 
+    lay = get_current_tile(winlist, WinPosInfo)
     arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
 
     winlist[i0], winlist[i1] = winlist[i1], winlist[i0]
-    WinList[Desktop] = winlist
-    PERSISTENT_DATA['winlist'] = WinList
-    store()
+    PERSISTENT_DATA['winlist'] = winlist
     return True
 
 
@@ -720,30 +785,38 @@ def find(center, target, winlist, posinfo):
 
 
 def focus(target):
-    if NavigateAcrossWorkspaces:
-        Windows = WinListAll[Desktop]
-    else:
-        Windows = WinList[Desktop]
 
     active = get_active_window()
-    target = find(active, target, Windows, WinPosInfo)
-    if None == target:
+
+    target_window_id = find_kdtree(active, target, allow_parent_sibling=False)
+
+    if None == target_window_id:
+        if config.NavigateAcrossWorkspaces:
+            Windows = WinListAll
+        else:
+            Windows = WinList
+        target_window_id = find(active, target, Windows, WinPosInfo)
+
+    if None == target_window_id:
+        target_window_id = find_kdtree(active, target, allow_parent_sibling=True)
+
+    if None == target_window_id:
         return False
-    i1 = Windows.index(target)
-    raise_window(Windows[i1])
+
+    raise_window(target_window_id)
     return True
 
 
-def focus_kdtree(target):
+def find_kdtree(center, target, allow_parent_sibling=True):
     '''
     Adjust non-overlapping layout.
     '''
+    active = center
 
-    active = get_active_window()
     if None == active:
-        return False
+        return None
 
-    winlist = WinList[Desktop]
+    winlist = WinList
     lay = get_current_tile(winlist, WinPosInfo)
     _tree, _map = getkdtree(winlist, lay)
     current_node = _map[active]
@@ -753,11 +826,15 @@ def focus_kdtree(target):
     else:
         promote = target in ['down', 'up']
 
+
     shift = -1 if target in ['left', 'up'] else 1
 
+    promoted=False
+    
     c = current_node
     if promote:
         c = c.parent
+        promoted=True
 
     while True:
         i = c.parent.children.index(c)
@@ -765,31 +842,30 @@ def focus_kdtree(target):
             target = c.parent.children[i + shift]
             break
         if None == c.parent.parent or None == c.parent.parent.parent:
-            return False
+            return None
         c = c.parent.parent
+        promoted=True
 
+    if promoted:
+        if not allow_parent_sibling:
+            if not target.leaf:
+                return None
     if None == target or target.overlap:
-        return False
+        return None
     else:
-        raise_window(target.key)
-        return True
+        return target.key
 
 
 def minimize(wincount):
-    winlist = create_win_list(WinList)
-    for win in winlist:
+    for win in WinList:
         minimize_one(win)
 
 
 def maximize(wincount):
     active = get_active_window()
-    winlist = create_win_list(WinList)
-    for win in winlist:
+    for win in WinList:
         maximize_one(win)
     raise_window(active)
-    return None
-
-    maximize_one(active)
     return None
 
 
@@ -809,41 +885,75 @@ def lock(_file, wait=0.5):
 def unlock(_file):
     os.remove(_file)
 
+def get_active_window():
+    active = int(_exec_and_output("xdotool getactivewindow").split()[0])
+    if active not in WinList:
+        active = None
+    return active
+
+def store():
+    active=get_active_window()
+    if not None == active:
+        h = PERSISTENT_DATA.get('active_history', [])
+        h.insert(0, active)
+        PERSISTENT_DATA['active_history'] = h[:1000]
+    with open(config.TempFile, 'w') as f:
+        PERSISTENT_DATA_ALL[Desktop] = PERSISTENT_DATA
+        f.write(str(PERSISTENT_DATA_ALL))
+
+
+desktop, desktop_x, desktop_y, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr = initialize1()
+WinList, WinListAll, WinPosInfo = initialize2(desktop)
+Desktop = '%s,%s,%s' % (desktop, desktop_x, desktop_y)
+
+MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
+MaxHeight = int(MaxHeightStr) - TopPadding - BottomPadding
+OrigX = int(OrigXstr) + LeftPadding
+OrigY = int(OrigYstr) + TopPadding
+
+if os.path.exists(config.TempFile):
+    PERSISTENT_DATA_ALL = eval(open(config.TempFile).read())
+else:
+    PERSISTENT_DATA_ALL = {}
+PERSISTENT_DATA = PERSISTENT_DATA_ALL.get(Desktop, {})
+OldWinList = PERSISTENT_DATA.get('winlist', [])
 
 if __name__ == '__main__':
-    lock(LockFile)
-    from docopt import docopt
-    arguments = docopt(__doc__)
+    if lock(LockFile):
+        from docopt import docopt
+        arguments = docopt(__doc__)
 
-    for target in ('up', 'down', 'left', 'right'):
-        if arguments[target]:
-            break
+        for target in ('up', 'down', 'left', 'right'):
+            if arguments[target]:
+                break
 
-    if False:
-        pass
-    elif arguments['cycle']:
-        cycle()
-    elif arguments['anticycle']:
-        cycle(reverse=True)
-    elif arguments['swap']:
-        swap(target)
-    elif arguments['move']:
-        move(target)
-    elif arguments['focus']:
-        if not focus(target):
-            focus_kdtree(target)
+        if False:
+            pass
+        elif arguments['cycle']:
+            cycle()
+        elif arguments['anticycle']:
+            cycle(reverse=True)
+        elif arguments['swap']:
+            swap(target)
+        elif arguments['move']:
+            move(target)
+        elif arguments['focus']:
+            focus(target)
 
-    elif arguments['layout']:
-        assert not arguments['next'] == arguments['prev']
-        change_tile(reverse=arguments['prev'])
-    elif arguments['grow']:
-        if arguments['width']:
-            resize(config.RESIZE_STEP, 0)
-        else:
-            resize(0, config.RESIZE_STEP)
-    elif arguments['shrink']:
-        if arguments['width']:
-            resize(-config.RESIZE_STEP, 0)
-        else:
-            resize(0, -config.RESIZE_STEP)
-    unlock(LockFile)
+        elif arguments['layout']:
+            assert not arguments['next'] == arguments['prev']
+            change_tile_or_insert_new_window(shift=-1 if arguments['prev'] else 1)
+        elif arguments['grow']:
+            if arguments['width']:
+                resize(config.RESIZE_STEP, 0)
+            else:
+                resize(0, config.RESIZE_STEP)
+        elif arguments['shrink']:
+            if arguments['width']:
+                resize(-config.RESIZE_STEP, 0)
+            else:
+                resize(0, -config.RESIZE_STEP)
+
+        store()
+
+        unlock(LockFile)

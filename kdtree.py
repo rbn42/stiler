@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 from divide import divide
+import config
 
 
 def kdtree(_input, path=None, treemap=None, parentmeta=None, parent=None):
@@ -92,7 +93,13 @@ def create_parent(node):
     index = parent.parent.children.index(node)
     parent.parent.children[index] = parent
     return parent
-
+def create_sibling(node):
+    sibling=Node()
+    sibling.parent=node.parent
+    sibling.position=[i for i in node.position]
+    i=node.parent.children.index(node)
+    node.parent.children.insert(i+1,sibling)
+    return sibling
 
 class Node:
     parent = None
@@ -192,19 +199,22 @@ def remove_single_child_node(node):
         remove_single_child_node(child)
 
 
-def getLayoutAndKey(node, result=None, min_width=50, min_height=50):
+def getLayoutAndKey(node, result=None, min_width=config.MIN_WINDOW_WIDTH, min_height=config.MIN_WINDOW_HEIGHT):
     if None == result:
-        result = [], []
+        reach_size_limit=False
+        result =[ [], [],reach_size_limit]
     if node.leaf:
         x0, y0, x1, y1 = node.position
         if x1 - x0 < min_width or y1 - y0 < min_height:
-            # error
-            print("reach min size")
-            a = 1 / 0
+            #("reach min size")
+            result[2]=True
+            return result
         layout = [x0, y0, x1 - x0, y1 - y0]
         result[0].append(layout)
         result[1].append(node.key)
     else:
         for child in node.children:
             getLayoutAndKey(child, result)
+            if result[2]:
+                return result
     return result
