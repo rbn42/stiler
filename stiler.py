@@ -220,8 +220,11 @@ def change_tile(shift):
         TILES.append('col1')
     TILES.append('maximize')
 
+    #for rotated screen
     if MaxWidth < MaxHeight:
-        TILES=['col1']
+        if len(winlist) > 1:
+            TILES=['col1']
+        TILES.append('maximize')
 
     # TODO unable to compare windows's numbers between different workspaces
 
