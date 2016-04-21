@@ -103,15 +103,12 @@ def initialize2(desktop):
     return win_list, win_list_all,  WinPosInfoAll
 
 
-
-
 def get_last_active_window():
     for active in PERSISTENT_DATA.get('active_history', []):
         if active in WinList:
-            if not active==get_active_window():
+            if not active == get_active_window():
                 return active
     return None
-
 
 
 def get_simple_tile(wincount):
@@ -140,7 +137,7 @@ def change_tile_or_insert_new_window(shift):
     if len(WinList) < 1:
         return
 
-    if len(WinList) ==1+ len(OldWinList): 
+    if len(WinList) == 1 + len(OldWinList):
         if insert_focused_window_into_kdtree():
             return
     if len(WinList) == len(OldWinList):
@@ -149,24 +146,22 @@ def change_tile_or_insert_new_window(shift):
         change_tile(0)
 
 
-
-
 def insert_focused_window_into_kdtree():
-    active=get_active_window()
-    if None==active:
+    active = get_active_window()
+    if None == active:
         return False
-    last_active=get_last_active_window()
-    if None==last_active:
+    last_active = get_last_active_window()
+    if None == last_active:
         return False
-    if insert_window_into_kdtree(active,last_active):
+    if insert_window_into_kdtree(active, last_active):
         PERSISTENT_DATA['winlist'] = WinList
         return True
     return False
 
 
 def regularize_kd_tree(regularize_node,
-        min_width=config.MIN_WINDOW_WIDTH,
-        min_height=config.MIN_WINDOW_HEIGHT):
+                       min_width=config.MIN_WINDOW_WIDTH,
+                       min_height=config.MIN_WINDOW_HEIGHT):
     if None == regularize_node:
         return False
     # regularize k-d tree
@@ -220,10 +215,10 @@ def change_tile(shift):
         TILES.append('col1')
     TILES.append('maximize')
 
-    #for rotated screen
+    # for rotated screen
     if MaxWidth < MaxHeight:
         if len(winlist) > 1:
-            TILES=['col1']
+            TILES = ['col1']
         TILES.append('maximize')
 
     # TODO unable to compare windows's numbers between different workspaces
@@ -593,18 +588,20 @@ def resize_kdtree(resize_width, resize_height):
 
     return regularize_kd_tree(regularize_node)
 
-def insert_window_into_kdtree(winid,target):
-    winlist=[w for w in WinList if not w==winid]
+
+def insert_window_into_kdtree(winid, target):
+    winlist = [w for w in WinList if not w == winid]
     lay = get_current_tile(winlist, WinPosInfo)
     _tree, _map = getkdtree(winlist, lay)
     target_node = _map[target]
     if target_node.parent.overlap:
         return False
     from kdtree import create_sibling
-    node=create_sibling(target_node)
-    node.key=winid
-    node.leaf=True
+    node = create_sibling(target_node)
+    node.key = winid
+    node.leaf = True
     return regularize_kd_tree(node.parent)
+
 
 def move_kdtree(target, allow_create_new_node=True):
     '''
@@ -695,7 +692,7 @@ def move_kdtree(target, allow_create_new_node=True):
 
     # regularize k-d tree
     regularize_node = regularize_node.parent
-    return regularize_kd_tree(regularize_node,min_width=1,min_height=1)
+    return regularize_kd_tree(regularize_node, min_width=1, min_height=1)
 
 
 def swap(target):
@@ -712,7 +709,8 @@ def swap(target):
         target_window_id = find(active, target, winlist, WinPosInfo)
 
     if None == target_window_id:
-        target_window_id = find_kdtree(active, target, allow_parent_sibling=True)
+        target_window_id = find_kdtree(
+            active, target, allow_parent_sibling=True)
 
     if None == target_window_id:
         return False
@@ -737,8 +735,8 @@ def find(center, target, winlist, posinfo):
     if None == center:
         lay_center = MaxWidth / 2.0, MaxHeight / 2.0
     else:
-        lay_center =get_current_tile([center],WinPosInfo)[0] 
-        lay_center= cal_center(*lay_center)
+        lay_center = get_current_tile([center], WinPosInfo)[0]
+        lay_center = cal_center(*lay_center)
     _min = -1
     _r = None
     for w, l in zip(winlist, lay):
@@ -784,7 +782,8 @@ def focus(target):
         target_window_id = find(active, target, Windows, WinPosInfo)
 
     if None == target_window_id:
-        target_window_id = find_kdtree(active, target, allow_parent_sibling=True)
+        target_window_id = find_kdtree(
+            active, target, allow_parent_sibling=True)
 
     if None == target_window_id:
         return False
@@ -815,15 +814,14 @@ def find_kdtree(center, target, allow_parent_sibling=True):
     else:
         promote = target in ['down', 'up']
 
-
     shift = -1 if target in ['left', 'up'] else 1
 
-    promoted=False
-    
+    promoted = False
+
     c = current_node
     if promote:
         c = c.parent
-        promoted=True
+        promoted = True
 
     while True:
         i = c.parent.children.index(c)
@@ -833,7 +831,7 @@ def find_kdtree(center, target, allow_parent_sibling=True):
         if None == c.parent.parent or None == c.parent.parent.parent:
             return None
         c = c.parent.parent
-        promoted=True
+        promoted = True
 
     if promoted:
         if not allow_parent_sibling:
@@ -874,6 +872,7 @@ def lock(_file, wait=0.5):
 def unlock(_file):
     os.remove(_file)
 
+
 def get_active_window(allow_outofworkspace=False):
     active = int(_exec_and_output("xdotool getactivewindow").split()[0])
     if allow_outofworkspace:
@@ -882,8 +881,9 @@ def get_active_window(allow_outofworkspace=False):
         active = None
     return active
 
+
 def store():
-    active=get_active_window()
+    active = get_active_window()
     if not None == active:
         h = PERSISTENT_DATA.get('active_history', [])
         h.insert(0, active)
@@ -933,7 +933,8 @@ if __name__ == '__main__':
 
         elif arguments['layout']:
             assert not arguments['next'] == arguments['prev']
-            change_tile_or_insert_new_window(shift=-1 if arguments['prev'] else 1)
+            change_tile_or_insert_new_window(
+                shift=-1 if arguments['prev'] else 1)
         elif arguments['grow']:
             if arguments['width']:
                 resize(config.RESIZE_STEP, 0)
