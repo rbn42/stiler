@@ -737,8 +737,8 @@ def find(center, target, winlist, posinfo):
     if None == center:
         lay_center = MaxWidth / 2.0, MaxHeight / 2.0
     else:
-        m = {w: l for w, l in zip(winlist, lay)}
-        lay_center = cal_center(* m[center])
+        lay_center =get_current_tile([center],WinPosInfo)[0] 
+        lay_center= cal_center(*lay_center)
     _min = -1
     _r = None
     for w, l in zip(winlist, lay):
@@ -772,7 +772,7 @@ def find(center, target, winlist, posinfo):
 
 def focus(target):
 
-    active = get_active_window()
+    active = get_active_window(allow_outofworkspace=True)
 
     target_window_id = find_kdtree(active, target, allow_parent_sibling=False)
 
@@ -803,6 +803,9 @@ def find_kdtree(center, target, allow_parent_sibling=True):
         return None
 
     winlist = WinList
+
+    if active not in winlist:
+        return None
     lay = get_current_tile(winlist, WinPosInfo)
     _tree, _map = getkdtree(winlist, lay)
     current_node = _map[active]
@@ -871,8 +874,10 @@ def lock(_file, wait=0.5):
 def unlock(_file):
     os.remove(_file)
 
-def get_active_window():
+def get_active_window(allow_outofworkspace=False):
     active = int(_exec_and_output("xdotool getactivewindow").split()[0])
+    if allow_outofworkspace:
+        return active
     if active not in WinList:
         active = None
     return active
