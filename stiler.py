@@ -90,6 +90,9 @@ def initialize2(desktop):
             continue
 
         winid, x, y, w, h = int(winid, 16), int(x), int(y), int(w), int(h)
+        #minimized
+        if 'window state: Normal' not in _exec_and_output('xprop -id %s'%winid):
+            continue
 
         win_list_all.append(winid)
         WinPosInfoAll[winid] = name, [x, y - 72 + 44, w, h]
