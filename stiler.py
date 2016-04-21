@@ -875,6 +875,8 @@ def unlock(_file):
 
 def get_active_window(allow_outofworkspace=False):
     active = int(_exec_and_output("xdotool getactivewindow").split()[0])
+    if active not in WinPosInfo:
+        return None
     if allow_outofworkspace:
         return active
     if active not in WinList:
