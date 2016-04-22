@@ -375,6 +375,15 @@ def move_window(windowid, x, y, w, h):
     w-=f_left+f_right
     h-=f_top+f_bottom
 
+#           _name = WinPosInfo[windowid][0]
+
+    #   if check_notitle(_name):
+    wmclass=get_wm_class(windowid)
+    for n in config.NOTITLE_WMCLASS:
+        if n in wmclass:
+            y += f_top
+            x+=f_left
+            break
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
 
@@ -388,6 +397,10 @@ def move_window(windowid, x, y, w, h):
 #    command = 'xdotool windowmap "%s"' % windowid
 #    command = 'xdotool windowactivate "%s"' % windowid
 
+def get_wm_class(winid):
+    s=_exec_and_output('xprop -id %s | grep WM_CLASS'%winid)
+    s=re.findall('^.+?\=(.+)',s)[0]
+    return eval(s)
 def get_window_frame_size(winid):
     s=_exec_and_output('xprop -id %s | grep _NET_FRAME_EXTENTS'%winid)
     l=re.findall('\d+',s)
@@ -442,15 +455,10 @@ def cycle(reverse=False):
     PERSISTENT_DATA['winlist'] = winlist
 
 
-def check_notitle1(name):
-    for n in config.NOTITLE1:
-        if n in name:
-            return True
-    return False
 
 
-def check_notitle2(name):
-    for n in config.NOTITLE2:
+def check_notitle(name):
+    for n in config.NOTITLE:
         if n in name:
             return True
     return False
