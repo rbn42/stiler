@@ -789,9 +789,9 @@ def focus(target):
             active, target, allow_parent_sibling=True)
 
     if None == target_window_id:
-        return False
-
-    raise_window(target_window_id)
+        raise_window(active)
+    else:   
+        raise_window(target_window_id)
     return True
 
 
