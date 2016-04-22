@@ -141,19 +141,6 @@ def get_desktop_geom():
   return DesktopInfo(width, height)
 
 
-if __name__ == '__main__':
-  windows = get_windows()
-  print "Found following windows :"
-  for desk in windows:
-    print "--- Desktop %i"%desk
-    for w in windows[desk]:
-      print w
-  print "---"
-
-  desktop = get_desktop_geom()
-  print desktop
-
-  print "current_desktop : %i"%get_current_desktop()
 
 
 disp = display.Display()
@@ -184,3 +171,17 @@ def get_shift():
     w=moveandresize(win,*pos3)
     w.get_geometry()
     return shift
+
+if __name__ == '__main__':
+  windows = get_windows()
+  print "Found following windows :"
+  for desk in windows:
+    print "--- Desktop %i"%desk
+    for w in windows[desk]:
+      print w
+  print "---"
+
+  desktop = get_desktop_geom()
+  print desktop
+
+  print "current_desktop : %i"%get_current_desktop()
