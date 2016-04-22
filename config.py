@@ -1,4 +1,3 @@
-WinTitle = 28
 WinBorder = 5
 BottomPadding = 15
 TopPadding = BottomPadding
@@ -7,8 +6,6 @@ RightPadding = BottomPadding
 NavigateAcrossWorkspaces = True  # TODO availabe in Unity7
 TempFile = "/dev/shm/.stiler_db"
 LockFile = "/dev/shm/.stiler.lock"
-NOTITLE1=['tilda'] #['tilda','VLC']
-NOTITLE2=['VLC','foobar2000','GoldenDict'] #['tilda','VLC']
 EXCLUDE_APPLICATIONS=['<unknown>', 'x-nautilus-desktop','unity-launcher', 'unity-panel'] + ['Hud','unity-dash', 'Desktop','screenkey','XdndCollectionWindowImp']
 UNRESIZABLE_APPLICATIONS=['Screenkey']       
 RESIZE_STEP=50

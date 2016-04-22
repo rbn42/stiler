@@ -95,7 +95,7 @@ def initialize2(desktop):
             continue
 
         win_list_all.append(winid)
-        WinPosInfoAll[winid] = name, [x, y - 72 + 44, w, h]
+        WinPosInfoAll[winid] = name, [x, y , w, h]
 
         if x < 0 or x >= resx or y < 0 or y >= resy:
             continue
@@ -169,7 +169,7 @@ def regularize_kd_tree(regularize_node,
         return False
     # regularize k-d tree
     from kdtree import regularize
-    regularize(regularize_node, border=(2 * WinBorder, WinBorder + WinTitle))
+    regularize(regularize_node, border=(2 * WinBorder, WinBorder *2 )) 
 
     # load k-d tree
     from kdtree import getLayoutAndKey
@@ -250,7 +250,7 @@ def get_vertical_tile(wincount):
     layout = []
     y = OrigY
     width = int(MaxWidth / wincount)
-    height = MaxHeight - WinTitle - WinBorder
+    height = MaxHeight - 2* WinBorder
     for n in range(0, wincount):
         x = OrigX + n * width
         layout.append((x, y, width, height))
@@ -261,7 +261,7 @@ def get_vertical_tile(wincount):
 def get_horiz_tile(wincount):
     layout = []
     x = OrigX
-    height = int(MaxHeight / wincount - WinTitle - WinBorder)
+    height = int(MaxHeight / wincount - 2* WinBorder)
     width = MaxWidth
     for n in range(0, wincount):
         y = OrigY + int((MaxHeight / wincount) * (n))
@@ -313,7 +313,10 @@ def get_columns_tile2(wincount, reverse=False, cols=2):
 
 
 def layout_shift(x, y, w, h):
-    return OrigX + x + WinBorder, OrigY + y + WinBorder, w - 2 * WinBorder, h - WinTitle - 2 * WinBorder
+    return (OrigX + x + WinBorder,
+            OrigY + y + WinBorder,
+            w - 2 * WinBorder,
+            h -  2 * WinBorder)
 # from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
 
 
@@ -326,7 +329,7 @@ def get_columns_tile(wincount, ncolumns):
     x = OrigX
     y = OrigY
 
-    height = int(MaxHeight / nrows - WinTitle - WinBorder)
+    height = int(MaxHeight / nrows - 2* WinBorder)
     width = int(MaxWidth / ncolumns - 2 * WinBorder)
 
     for n in range(0, wincount):
@@ -367,13 +370,14 @@ def move_window(windowid, x, y, w, h):
     # Unmaximize window
     unmaximize_one(windowid)
     # Now move it
-    _name = WinPosInfo[windowid][0]
-    if check_notitle1(_name):
-        h += WinTitle
-    if check_notitle2(_name):
-        y += WinTitle
+
+    f_left,f_right,f_top,f_bottom=get_window_frame_size(windowid)
+    w-=f_left+f_right
+    h-=f_top+f_bottom
+
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
+
     #command='xdotool windowmove  %d %d %d' %(windowid,x,y)
     # print(command)
     #command='xdotool windowsize  %d %d %d' %(windowid,w,h)
@@ -384,7 +388,24 @@ def move_window(windowid, x, y, w, h):
 #    command = 'xdotool windowmap "%s"' % windowid
 #    command = 'xdotool windowactivate "%s"' % windowid
 
+def get_window_frame_size(winid):
+    s=_exec_and_output('xprop -id %s | grep _NET_FRAME_EXTENTS'%winid)
+    l=re.findall('\d+',s)
+    return [int(i) for i in l]
 
+def get_current_tile(wins, posinfo):
+    l = []
+    for _id in wins:
+        _name, _pos = posinfo[_id]
+        x, y, w, h = _pos
+        f_left,f_right,f_top,f_bottom=get_window_frame_size(_id)
+        y-=f_top
+        x-=f_left
+        h+=f_top+f_bottom
+        w+=f_left+f_right
+
+        l.append([x, y, w, h])
+    return l
 def raise_window(windowid):
     if False:
         command = 'xdotool windowactivate %d' % windowid
@@ -404,16 +425,6 @@ def arrange(layout, windows):
         move_window(win, *lay)
 
 
-def get_current_tile(wins, posinfo):
-    l = []
-    for _id in wins:
-        _name, _pos = posinfo[_id]
-        x, y, w, h = _pos
-        if check_notitle1(_name):
-            h -= WinTitle
-            y += WinTitle
-        l.append([x, y, w, h])
-    return l
 
 
 def cycle(reverse=False):
@@ -722,6 +733,7 @@ def swap(target):
     i1 = winlist.index(target_window_id)
 
     lay = get_current_tile(winlist, WinPosInfo)
+    print(lay)
     arrange([lay[i0], lay[i1]], [winlist[i1], winlist[i0]])
 
     winlist[i0], winlist[i1] = winlist[i1], winlist[i0]
