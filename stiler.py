@@ -139,14 +139,32 @@ def get_simple_tile(wincount):
 def change_tile_or_insert_new_window(shift):
     if len(WinList) < 1:
         return
+    if shift < 0:
+        change_tile(shift)
+        return
 
     if len(WinList) == 1 + len(OldWinList):
         if insert_focused_window_into_kdtree():
+            return
+    if len(WinList) < len(OldWinList) or len(WinList) > len(OldWinList):
+        print(1)
+        print(WinList)
+        print(OldWinList)
+        if regularize_windows():
+            PERSISTENT_DATA['winlist'] = WinList
             return
     if len(WinList) == len(OldWinList):
         change_tile(shift)
     else:
         change_tile(0)
+
+
+def regularize_windows():
+    lay = get_current_tile(WinList, WinPosInfo)
+    _tree, _map = getkdtree(WinList, lay)
+    if _tree.overlap:
+        return False
+    return regularize_kd_tree(_tree)
 
 
 def insert_focused_window_into_kdtree():
@@ -384,9 +402,12 @@ def move_window(windowid, x, y, w, h):
     # for n in config.NOFRAME_WMCLASS:
     #    if n in wmclass:
     #        break
-    if 'Stati' in _exec_and_output('xprop -id %s | grep gravi' % windowid):
-        y += f_top
-        x += f_left
+    try:
+        if 'Stati' in _exec_and_output('xprop -id %s | grep gravi' % windowid):
+            y += f_top
+            x += f_left
+    except:
+        pass
     # Now move it
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
@@ -678,11 +699,14 @@ def move_kdtree(target, allow_create_new_node=True):
                 _swap = False or not allow_create_new_node
                 if new_parent.leaf and not _swap:
                     # But allow no more than one branch for each node
+                    non_leaf_node_count = 0
                     for sibling in new_parent.parent.children:
                         if not sibling.leaf:
-                            # Just swap them.
-                            _swap = True
-                            break
+                            non_leaf_node_count += 1
+                            if not non_leaf_node_count < config.MAX_KD_TREE_BRANCH:
+                                # Just swap them.
+                                _swap = True
+                                break
                     else:
                         from kdtree import create_parent
                         new_parent = create_parent(new_parent)
