@@ -56,7 +56,7 @@ r_wmctrl_lG = '^([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\
 r_wmctrl_d = '(\d)+.+?(\d+)x(\d+).+?(\d+),(\d+).+?(\d+),(\d+).+?(\d+)x(\d+)'
 
 
-def initialize1():
+def initialize_desktop():
     desk_output = _exec_and_output("wmctrl -d").strip().split("\n")
 
     current = [x for x in desk_output if x.split()[1] == "*"][0]
@@ -66,7 +66,7 @@ def initialize1():
     return desktop, desktop_x, desktop_y, orig_x, orig_y, width, height
 
 
-def initialize2(desktop):
+def initialize_windows(desktop):
     cmd = "xdpyinfo | grep 'dimension' | awk -F: '{ print $2 }' | awk '{ print $1 }' "
     s = _exec_and_output(cmd)
     x, y = s.split('x')
@@ -90,12 +90,12 @@ def initialize2(desktop):
             continue
 
         winid, x, y, w, h = int(winid, 16), int(x), int(y), int(w), int(h)
-        #minimized
-        if 'window state: Normal' not in _exec_and_output('xprop -id %s'%winid):
+        # minimized
+        if 'window state: Normal' not in _exec_and_output('xprop -id %s' % winid):
             continue
 
         win_list_all.append(winid)
-        WinPosInfoAll[winid] = name, [x, y , w, h]
+        WinPosInfoAll[winid] = name, [x, y, w, h]
 
         if x < 0 or x >= resx or y < 0 or y >= resy:
             continue
@@ -169,7 +169,7 @@ def regularize_kd_tree(regularize_node,
         return False
     # regularize k-d tree
     from kdtree import regularize
-    regularize(regularize_node, border=(2 * WinBorder, WinBorder *2 )) 
+    regularize(regularize_node, border=(2 * WinBorder, WinBorder * 2))
 
     # load k-d tree
     from kdtree import getLayoutAndKey
@@ -227,6 +227,11 @@ def change_tile(shift):
     # TODO unable to compare windows's numbers between different workspaces
 
     t = PERSISTENT_DATA.get('tile', None)
+    arrange_twice = False
+    NOFRAME_LAYOUTS = ['maximize', 'minimize']
+    if t in NOFRAME_LAYOUTS:
+        # arrange windows twice to get exact frame size
+        arrange_twice = True
 
     if 0 == shift and t in tiles_map:
         pass
@@ -240,6 +245,8 @@ def change_tile(shift):
     tile = tiles_map[t](len(winlist))
     if not None == tile:
         arrange(tile, winlist)
+        if arrange_twice:
+            arrange(tile, winlist)
 
     PERSISTENT_DATA['overall_position'] = None
     PERSISTENT_DATA['tile'] = t
@@ -250,7 +257,7 @@ def get_vertical_tile(wincount):
     layout = []
     y = OrigY
     width = int(MaxWidth / wincount)
-    height = MaxHeight - 2* WinBorder
+    height = MaxHeight - 2 * WinBorder
     for n in range(0, wincount):
         x = OrigX + n * width
         layout.append((x, y, width, height))
@@ -261,7 +268,7 @@ def get_vertical_tile(wincount):
 def get_horiz_tile(wincount):
     layout = []
     x = OrigX
-    height = int(MaxHeight / wincount - 2* WinBorder)
+    height = int(MaxHeight / wincount - 2 * WinBorder)
     width = MaxWidth
     for n in range(0, wincount):
         y = OrigY + int((MaxHeight / wincount) * (n))
@@ -316,7 +323,7 @@ def layout_shift(x, y, w, h):
     return (OrigX + x + WinBorder,
             OrigY + y + WinBorder,
             w - 2 * WinBorder,
-            h -  2 * WinBorder)
+            h - 2 * WinBorder)
 # from https://bbs.archlinux.org/viewtopic.php?id=64100&p=7 #151
 
 
@@ -329,7 +336,7 @@ def get_columns_tile(wincount, ncolumns):
     x = OrigX
     y = OrigY
 
-    height = int(MaxHeight / nrows - 2* WinBorder)
+    height = int(MaxHeight / nrows - 2 * WinBorder)
     width = int(MaxWidth / ncolumns - 2 * WinBorder)
 
     for n in range(0, wincount):
@@ -365,60 +372,61 @@ def minimize_one(windowid):
     _exec(command)
 
 
-# def move_window(windowid, PosX, PosY, Width, Height):
 def move_window(windowid, x, y, w, h):
     # Unmaximize window
     unmaximize_one(windowid)
-    # Now move it
 
-    f_left,f_right,f_top,f_bottom=get_window_frame_size(windowid)
-    w-=f_left+f_right
-    h-=f_top+f_bottom
+    f_left, f_right, f_top, f_bottom = get_window_frame_size(windowid)
+    w -= f_left + f_right
+    h -= f_top + f_bottom
 
-#           _name = WinPosInfo[windowid][0]
-
-    #   if check_notitle(_name):
-    wmclass=get_wm_class(windowid)
-    for n in config.NOTITLE_WMCLASS:
+    wmclass = get_wm_class(windowid)
+    for n in config.NOFRAME_WMCLASS:
         if n in wmclass:
             y += f_top
-            x+=f_left
+            x += f_left
             break
+    # Now move it
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
 
     #command='xdotool windowmove  %d %d %d' %(windowid,x,y)
-    # print(command)
     #command='xdotool windowsize  %d %d %d' %(windowid,w,h)
-    # print(command)
-    #_exec(command)
     #command = "wmctrl -i -r " + windowid + " -b remove,hidden,shaded"
-#    _exec(command)
 #    command = 'xdotool windowmap "%s"' % windowid
 #    command = 'xdotool windowactivate "%s"' % windowid
 
+
 def get_wm_class(winid):
-    s=_exec_and_output('xprop -id %s | grep WM_CLASS'%winid)
-    s=re.findall('^.+?\=(.+)',s)[0]
+    s = _exec_and_output('xprop -id %s | grep WM_CLASS' % winid)
+    s = re.findall('^.+?\=(.+)', s)[0]
     return eval(s)
+
+
 def get_window_frame_size(winid):
-    s=_exec_and_output('xprop -id %s | grep _NET_FRAME_EXTENTS'%winid)
-    l=re.findall('\d+',s)
-    return [int(i) for i in l]
+    try:
+        s = _exec_and_output('xprop -id %s | grep _NET_FRAME_EXTENTS' % winid)
+        l = re.findall('\d+', s)
+        return [int(i) for i in l]
+    except:
+        return 0, 0, 0, 0
+
 
 def get_current_tile(wins, posinfo):
     l = []
     for _id in wins:
         _name, _pos = posinfo[_id]
         x, y, w, h = _pos
-        f_left,f_right,f_top,f_bottom=get_window_frame_size(_id)
-        y-=f_top
-        x-=f_left
-        h+=f_top+f_bottom
-        w+=f_left+f_right
+        f_left, f_right, f_top, f_bottom = get_window_frame_size(_id)
+        y -= f_top
+        x -= f_left
+        h += f_top + f_bottom
+        w += f_left + f_right
 
         l.append([x, y, w, h])
     return l
+
+
 def raise_window(windowid):
     if False:
         command = 'xdotool windowactivate %d' % windowid
@@ -438,8 +446,6 @@ def arrange(layout, windows):
         move_window(win, *lay)
 
 
-
-
 def cycle(reverse=False):
     winlist = create_win_list(WinList)
     lay = get_current_tile(winlist, WinPosInfo)
@@ -453,15 +459,6 @@ def cycle(reverse=False):
     raise_window(winlist[i1])
 
     PERSISTENT_DATA['winlist'] = winlist
-
-
-
-
-def check_notitle(name):
-    for n in config.NOTITLE:
-        if n in name:
-            return True
-    return False
 
 
 def getkdtree(winlist, lay):
@@ -810,7 +807,7 @@ def focus(target):
 
     if None == target_window_id:
         raise_window(active)
-    else:   
+    else:
         raise_window(target_window_id)
     return True
 
@@ -918,8 +915,8 @@ def store():
         f.write(str(PERSISTENT_DATA_ALL))
 
 
-desktop, desktop_x, desktop_y, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr = initialize1()
-WinList, WinListAll, WinPosInfo = initialize2(desktop)
+desktop, desktop_x, desktop_y, OrigXstr, OrigYstr, MaxWidthStr, MaxHeightStr = initialize_desktop()
+WinList, WinListAll, WinPosInfo = initialize_windows(desktop)
 Desktop = '%s,%s,%s' % (desktop, desktop_x, desktop_y)
 
 MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding
