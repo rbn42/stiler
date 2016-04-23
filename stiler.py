@@ -380,12 +380,13 @@ def move_window(windowid, x, y, w, h):
     w -= f_left + f_right
     h -= f_top + f_bottom
 
-    wmclass = get_wm_class(windowid)
-    for n in config.NOFRAME_WMCLASS:
-        if n in wmclass:
-            y += f_top
-            x += f_left
-            break
+    #wmclass = get_wm_class(windowid)
+    # for n in config.NOFRAME_WMCLASS:
+    #    if n in wmclass:
+    #        break
+    if 'Stati' in _exec_and_output('xprop -id %s | grep gravi' % windowid):
+        y += f_top
+        x += f_left
     # Now move it
     command = "wmctrl -i -r %d -e 0,%d,%d,%d,%d" % (windowid, x, y, w, h)
     _exec(command)
