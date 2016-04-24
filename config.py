@@ -9,6 +9,7 @@ LockFile = "/dev/shm/.stiler.lock"
 EXCLUDE_APPLICATIONS = ['<unknown>', 'x-nautilus-desktop', 'unity-launcher',
                         'unity-panel', 'Hud',
                         'unity-dash', 'Desktop',
+                        'Docky',
                         'screenkey', 'XdndCollectionWindowImp']
 UNRESIZABLE_APPLICATIONS = ['Screenkey']
 RESIZE_STEP = 50
