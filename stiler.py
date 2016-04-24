@@ -992,6 +992,10 @@ if __name__ == '__main__':
                 resize(-config.RESIZE_STEP, 0)
             else:
                 resize(0, -config.RESIZE_STEP)
+        elif arguments['save']:
+            print('not implemented')
+        elif arguments['load']:
+            print('not implemented')
 
         store()
 
