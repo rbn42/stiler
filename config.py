@@ -16,8 +16,7 @@ EXCLUDE_APPLICATIONS = ['<unknown>', 'x-nautilus-desktop', 'unity-launcher',
                         'unity-panel', 'Hud', 'unity-dash', 'Desktop',
                         'Docky',
                         'screenkey', 'XdndCollectionWindowImp']
-# Window title may be not accurate. This is an alternative to exclude
-# applications.
+# An alternative method to exclude applications.
 EXCLUDE_WM_CLASS = ['wesnoth-1.12']
 
 UNRESIZABLE_APPLICATIONS = ['Screenkey']
