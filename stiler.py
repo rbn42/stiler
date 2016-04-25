@@ -84,9 +84,12 @@ def initialize_windows(desktop):
 
         if not _desktop == desktop:
             continue
-        if host == 'N/A':
-            continue
+        # if host == 'N/A':
+        #    continue
         if name in config.EXCLUDE_APPLICATIONS:
+            continue
+        wmclass = set(get_wm_class(winid))
+        if not wmclass == wmclass - set(config.EXCLUDE_WM_CLASS):
             continue
 
         winid, x, y, w, h = int(winid, 16), int(x), int(y), int(w), int(h)
