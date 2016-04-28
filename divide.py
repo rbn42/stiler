@@ -3,6 +3,7 @@
 
 
 def divide(_input):
+    _input=[n for n in _input]
     _input.sort()
     l = [i for i, j in _input]
 

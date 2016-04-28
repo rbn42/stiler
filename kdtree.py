@@ -5,6 +5,7 @@ import config
 
 
 def kdtree(_input, path=None, treemap=None, parentmeta=None, parent=None):
+    _input=[n for n in _input]
     if None == treemap:
         # root
         treemap = {}
