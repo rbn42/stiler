@@ -40,6 +40,4 @@ Recommended Keyboard Mapping
 |`<Super> <Ctrl> l`    |  `python stiler.py move right` |
 |`<Super> <Shift> <Ctrl> l`    |  `python stiler.py grow width ` |
 
-Here is a configuration file dumped for Unity7:
-[org.gnome.settings-daemon.plugins.media-keys](https://github.com/rbn42/home/blob/master/config/dconf/org.gnome.settings-daemon.plugins.media-keys)
 
